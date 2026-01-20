@@ -30,7 +30,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Root endpoint - Health check
 @app.get("/")
 async def root():
     """
@@ -43,8 +42,14 @@ async def root():
         "status": "healthy"
     }
 
-# Additional route imports will go here
-# from routes import video, analysis
+# Import and register API routes
+from routes import analysis
+
+app.include_router(
+    analysis.router,
+    prefix="/api/ocr",
+    tags=["OCR"]
+)
 
 if __name__ == "__main__":
     # Run the server
