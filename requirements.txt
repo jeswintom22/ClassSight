@@ -3,20 +3,18 @@
 # Core Web Framework
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
-
-# OCR Engine
-easyocr==1.7.1
-pillow==10.2.0
-
-# AI Integration
-anthropic==0.18.1
+python-multipart==0.0.6
 
 # Utilities
-python-multipart==0.0.6
 python-dotenv==1.0.1
 
-# Additional dependencies for image processing
+# AI / ML & OCR
+easyocr==1.7.1
+pillow==10.2.0
 numpy==1.26.3
 opencv-python==4.9.0.80
-torch==2.1.2
-torchvision==0.16.2
+torch==2.0.1
+torchvision==0.15.2
+
+# Google Gemini API
+google-generativeai>=0.3.0

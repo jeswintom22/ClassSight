@@ -42,6 +42,10 @@ class OCRResponse(BaseModel):
     processing_time: float = Field(..., description="Time taken to process (seconds)")
     timestamp: datetime = Field(default_factory=datetime.now, description="When analysis was performed")
     
+    # AI Explanation Response
+    explanation: Optional[str] = Field(None, description="AI-generated educational explanation")
+    ai_model: Optional[str] = Field(None, description="AI model used for explanation")
+    
     class Config:
         json_schema_extra = {
             "example": {
@@ -55,6 +59,8 @@ class OCRResponse(BaseModel):
                         "bounding_box": [[10, 10], [200, 10], [200, 50], [10, 50]]
                     }
                 ],
+                "explanation": "This is a quadratic equation. We can solve it by factoring: (x+2)(x+3)=0, so x=-2 or x=-3.",
+                "ai_model": "gemini-flash-latest",
                 "processing_time": 0.45,
                 "timestamp": "2026-01-21T06:00:00"
             }

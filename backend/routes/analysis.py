@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from models.schemas import OCRResponse, OCRHealthResponse, ErrorResponse, TextBlock
 from services.ocr_service import OCRService
+from services.ai_service import AIService
 from config import settings
 import os
 import tempfile
@@ -22,8 +23,9 @@ from datetime import datetime
 # Create router for OCR endpoints
 router = APIRouter()
 
-# Initialize OCR service (singleton)
+# Initialize services (singleton)
 ocr_service = OCRService.get_instance()
+ai_service = AIService.get_instance()
 
 
 @router.get(
@@ -114,12 +116,29 @@ async def analyze_image(
         # Clean up temporary file
         os.unlink(temp_path)
         
+        # Get AI explanation if text was found
+        explanation = None
+        ai_model = None
+        
+        if result["combined_text"] and result["combined_text"].strip():
+            try:
+                # Use "classroom" context by default for MVP
+                ai_result = ai_service.explain_text(result["combined_text"], context="classroom")
+                if ai_result["success"]:
+                    explanation = ai_result["explanation"]
+                    ai_model = ai_result["model"]
+            except Exception as e:
+                # Don't fail the whole request if AI fails
+                print(f"⚠️ AI explanation failed: {str(e)}")
+        
         # Build response
         response = OCRResponse(
             success=True,
             combined_text=result["combined_text"],
             confidence=result["confidence"],
             blocks=[TextBlock(**block) for block in result["blocks"]],
+            explanation=explanation,
+            ai_model=ai_model,
             processing_time=result["processing_time"],
             timestamp=datetime.now()
         )

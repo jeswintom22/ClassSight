@@ -12,12 +12,16 @@ Author: ClassSight Team
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from config import settings
+from routes import analysis
 import uvicorn
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
     title="ClassSight API",
-    description="AI-powered classroom content capture and explanation system",
+    description="Backend for ClassSight AI Classroom Assistant",
     version="0.1.0"
 )
 
@@ -29,6 +33,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Mock Data (for images)
+app.mount("/mock_data", StaticFiles(directory="../mock_data"), name="mock_data")
+
+# Mount API Routes
+app.include_router(analysis.router, prefix="/api/ocr", tags=["OCR"])
+
+# Mount Frontend (Static Files)
+# Note: This checks for the frontend folder relative to main.py
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
 @app.get("/")
 async def root():

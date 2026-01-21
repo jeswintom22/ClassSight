@@ -15,7 +15,7 @@ class Settings:
     """Application settings loaded from environment variables."""
     
     # API Keys
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     
     # Server Configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")
@@ -28,10 +28,15 @@ class Settings:
     # Frame Processing
     FRAME_CAPTURE_INTERVAL: int = int(os.getenv("FRAME_CAPTURE_INTERVAL", "3"))
     
+    # AI Settings (Gemini)
+    AI_MODEL: str = os.getenv("AI_MODEL", "gemini-flash-latest")  # Points to latest Flash model
+    AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
+    AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))
+    
     def validate(self):
         """Validate that required settings are present."""
-        if not self.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY not set in .env file")
+        if not self.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not set in .env file")
         return True
 
 # Create global settings instance
