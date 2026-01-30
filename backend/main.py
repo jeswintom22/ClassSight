@@ -37,19 +37,11 @@ app.add_middleware(
 # Mount Mock Data (for images)
 app.mount("/mock_data", StaticFiles(directory="../mock_data"), name="mock_data")
 
-# Mount API Routes
-app.include_router(analysis.router, prefix="/api/ocr", tags=["OCR"])
-
-# Mount Frontend (Static Files)
-# Note: This checks for the frontend folder relative to main.py
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
-
-@app.get("/")
-async def root():
+# API Health Endpoint (must be before static files mount)
+@app.get("/api/health")
+async def api_health():
     """
-    Health check endpoint.
+    API health check endpoint.
     Returns API status and version.
     """
     return {
@@ -58,14 +50,14 @@ async def root():
         "status": "healthy"
     }
 
-# Import and register API routes
-from routes import analysis
+# Mount API Routes
+app.include_router(analysis.router, prefix="/api/ocr", tags=["OCR"])
 
-app.include_router(
-    analysis.router,
-    prefix="/api/ocr",
-    tags=["OCR"]
-)
+# Mount Frontend (Static Files) - This MUST be last
+# Note: This checks for the frontend folder relative to main.py
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
 if __name__ == "__main__":
     # Run the server
