@@ -11,10 +11,15 @@ python-dotenv==1.0.1
 # AI / ML & OCR
 easyocr==1.7.1
 pillow==10.2.0
-numpy==1.26.3
+numpy<2
 opencv-python==4.9.0.80
 torch==2.0.1
 torchvision==0.15.2
 
 # Google Gemini API
 google-generativeai>=0.3.0
+
+# Security
+slowapi==0.1.9  # Rate limiting
+bleach==6.1.0  # HTML sanitization (XSS prevention)
+python-magic-bin==0.4.14  # File type validation (Windows compatible)

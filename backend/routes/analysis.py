@@ -10,12 +10,14 @@ Routes:
 Author: ClassSight Team
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request
 from fastapi.responses import JSONResponse
 from models.schemas import OCRResponse, OCRHealthResponse, ErrorResponse, TextBlock
 from services.ocr_service import OCRService
 from services.ai_service import AIService
 from config import settings
+from utils.validators import InputValidator
+from middleware.slowapi_config import limiter, HEALTH_LIMIT, ANALYSIS_LIMIT, DEFAULT_LIMIT
 import os
 import tempfile
 from datetime import datetime
@@ -27,6 +29,9 @@ router = APIRouter()
 ocr_service = OCRService.get_instance()
 ai_service = AIService.get_instance()
 
+# Initialize input validator
+validator = InputValidator()
+
 
 @router.get(
     "/health",
@@ -34,7 +39,8 @@ ai_service = AIService.get_instance()
     summary="Check OCR Service Health",
     description="Returns status of the OCR service and whether the model is loaded."
 )
-async def health_check():
+@limiter.limit(HEALTH_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
+async def health_check(request: Request):
     """
     Health check endpoint for OCR service.
     
@@ -56,10 +62,13 @@ async def health_check():
     responses={
         200: {"description": "Successfully extracted text from image"},
         400: {"description": "Invalid file format or missing file"},
+        429: {"description": "Rate limit exceeded"},
         500: {"description": "OCR processing error"}
     }
 )
+@limiter.limit(ANALYSIS_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
 async def analyze_image(
+    request: Request,
     file: UploadFile = File(..., description="Image file (PNG, JPG, JPEG)")
 ):
     """
@@ -75,30 +84,20 @@ async def analyze_image(
         HTTPException: If file is invalid or OCR fails
     """
     
-    # Validate file is provided
-    if not file:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+    # ==================== Security Validation ====================
     
-    # Validate file type
-    allowed_extensions = [".png", ".jpg", ".jpeg", ".bmp"]
-    file_ext = os.path.splitext(file.filename)[1].lower()
+    # 1. Validate file upload (extension, MIME type)
+    validator.validate_file_upload(file, max_size=settings.MAX_UPLOAD_SIZE)
     
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type: {file_ext}. Allowed: {', '.join(allowed_extensions)}"
-        )
-    
-    # Validate file size (max 10MB)
-    # Read file content
+    # 2. Read file content
     contents = await file.read()
-    file_size_mb = len(contents) / (1024 * 1024)
     
-    if file_size_mb > 10:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large: {file_size_mb:.2f}MB. Maximum: 10MB"
-        )
+    # 3. Validate file content (size, magic numbers)
+    # This prevents file type spoofing by checking actual file bytes
+    validator.validate_file_content(contents, max_size=settings.MAX_UPLOAD_SIZE)
+    
+    # 4. Sanitize filename to prevent path traversal
+    safe_filename = validator.sanitize_filename(file.filename)
     
     # Reset file pointer for processing
     await file.seek(0)
@@ -106,6 +105,7 @@ async def analyze_image(
     try:
         # Save uploaded file temporarily
         # EasyOCR works best with file paths
+        file_ext = os.path.splitext(safe_filename)[1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
             temp_file.write(contents)
             temp_path = temp_file.name
@@ -122,8 +122,15 @@ async def analyze_image(
         
         if result["combined_text"] and result["combined_text"].strip():
             try:
+                # Sanitize OCR text before sending to AI (prevent prompt injection)
+                sanitized_text = validator.sanitize_text(
+                    result["combined_text"],
+                    max_length=settings.MAX_TEXT_LENGTH,
+                    strip_html=True
+                )
+                
                 # Use "classroom" context by default for MVP
-                ai_result = ai_service.explain_text(result["combined_text"], context="classroom")
+                ai_result = ai_service.explain_text(sanitized_text, context="classroom")
                 if ai_result["success"]:
                     explanation = ai_result["explanation"]
                     ai_model = ai_result["model"]
@@ -162,7 +169,8 @@ async def analyze_image(
     summary="OCR Service Info",
     description="Returns basic information about the OCR service."
 )
-async def ocr_info():
+@limiter.limit(DEFAULT_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
+async def ocr_info(request: Request):
     """Default OCR endpoint with service information."""
     return {
         "service": "ClassSight OCR",
