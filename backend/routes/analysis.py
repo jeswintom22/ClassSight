@@ -110,8 +110,17 @@ async def analyze_image(
             temp_file.write(contents)
             temp_path = temp_file.name
         
-        # Process with OCR service
-        result = ocr_service.extract_text(temp_path)
+        # Calculate image hash for caching
+        image_hash = cache_service.get_image_hash(contents)
+        
+        # Check cache
+        cached_result = cache_service.get_ocr_result(image_hash)
+        if cached_result:
+            print("🖼️ Image Cache Hit!")
+            return OCRResponse(**cached_result)
+        
+        # Process with OCR service (run in threadpool to avoid blocking main loop)
+        result = await run_in_threadpool(ocr_service.extract_text, temp_path)
         
         # Clean up temporary file
         os.unlink(temp_path)
@@ -130,7 +139,8 @@ async def analyze_image(
                 )
                 
                 # Use "classroom" context by default for MVP
-                ai_result = ai_service.explain_text(sanitized_text, context="classroom")
+                # AWAIT the async AI call
+                ai_result = await ai_service.explain_text(sanitized_text, context="classroom")
                 if ai_result["success"]:
                     explanation = ai_result["explanation"]
                     ai_model = ai_result["model"]
@@ -139,18 +149,21 @@ async def analyze_image(
                 print(f"⚠️ AI explanation failed: {str(e)}")
         
         # Build response
-        response = OCRResponse(
-            success=True,
-            combined_text=result["combined_text"],
-            confidence=result["confidence"],
-            blocks=[TextBlock(**block) for block in result["blocks"]],
-            explanation=explanation,
-            ai_model=ai_model,
-            processing_time=result["processing_time"],
-            timestamp=datetime.now()
-        )
+        response_data = {
+            "success": True,
+            "combined_text": result["combined_text"],
+            "confidence": result["confidence"],
+            "blocks": [TextBlock(**block) for block in result["blocks"]],
+            "explanation": explanation,
+            "ai_model": ai_model,
+            "processing_time": result["processing_time"],
+            "timestamp": datetime.now()
+        }
         
-        return response
+        # Cache the successful response
+        cache_service.set_ocr_result(image_hash, response_data)
+        
+        return OCRResponse(**response_data)
     
     except Exception as e:
         # Clean up temp file if it exists

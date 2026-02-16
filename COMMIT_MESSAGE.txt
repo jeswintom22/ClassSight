@@ -1,0 +1,24 @@
+feat: Phase 4 API Optimization, UI Overhaul, and Bug Fixes
+
+BREAKING CHANGE: WebSocket endpoint added at `/api/ws/stream`. Frontend updated to use WebSocket for real-time analysis.
+
+Performance & Backend:
+- Implemented `CacheService` for OCR and AI results (TTL-based caching)
+- Added asynchronous processing for AI calls (`asyncio`) and OCR (`run_in_threadpool`)
+- Added image preprocessing (resize/compress) to `ocr_service.py` to speed up analysis
+- Fixed JSON serialization error in `ocr_service.py` by casting NumPy types to native Python types
+- Added robust error handling and debug logging for OCR/AI pipeline
+
+Frontend & UI/UX:
+- Complete UI redesign with Glassmorphism aesthetic
+- Moved "Test Mock" button to header for better visibility
+- Implemented "Auto-Capture" mode with configurable intervals
+- Added "Session History" sidebar with export functionality
+- Added "Mock Mode" for offline UI testing and debugging
+- Fixed WebSocket connection issues for `file://` protocol usage
+- Added CSS/JS cache busting (`?v=2.0`)
+
+Documentation:
+- Updated `walkthrough.md` with new features and troubleshooting steps
+- Updated `task.md` with completed items
+- Updated `implementation_plan.md` with verification results

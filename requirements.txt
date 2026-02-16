@@ -7,6 +7,9 @@ python-multipart==0.0.6
 
 # Utilities
 python-dotenv==1.0.1
+cachetools>=5.3.0
+pytest>=7.4.0
+httpx>=0.25.0
 
 # AI / ML & OCR
 easyocr==1.7.1

@@ -140,6 +140,14 @@ async def api_health(request: Request):
 # Include OCR routes
 app.include_router(analysis.router, prefix="/api/ocr", tags=["OCR"])
 
+# Include WebSocket routes
+from routes import websocket
+app.include_router(websocket.router, prefix="/api/ws", tags=["WebSocket"])
+
+# Initialize Cache Service
+from services.cache_service import CacheService
+CacheService.get_instance().initialize()
+
 # ==================== Frontend Static Files ====================
 
 # Mount Frontend (Static Files) - This MUST be last

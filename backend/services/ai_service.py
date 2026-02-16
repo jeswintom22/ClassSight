@@ -67,9 +67,9 @@ class AIService:
         """Check if AI service is ready to generate explanations."""
         return AIService._model is not None
     
-    def explain_text(self, text: str, context: str = "classroom") -> Dict:
+    async def explain_text(self, text: str, context: str = "classroom") -> Dict:
         """
-        Generate an educational explanation for the given text.
+        Generate an educational explanation for the given text (Async).
         
         Args:
             text: The OCR-detected text to explain (e.g., "x² + 5x + 6 = 0")
@@ -99,27 +99,42 @@ class AIService:
                 "success": False
             }
         
+        # Check cache first
+        from services.cache_service import CacheService
+        cache_service = CacheService.get_instance()
+        text_hash = cache_service.get_text_hash(text)
+        cached_result = cache_service.get_ai_explanation(text_hash)
+        
+        if cached_result:
+            print("🧠 AI Cache Hit!")
+            return cached_result
+
         start_time = time.time()
         
         try:
             # Construct the prompt with educational context
             prompt = self._build_educational_prompt(text, context)
             
-            # Generate explanation
-            response = AIService._model.generate_content(prompt)
+            # Generate explanation (ASYNC)
+            response = await AIService._model.generate_content_async(prompt)
             
             # Extract the explanation text
             explanation = response.text if response.text else "Unable to generate explanation."
             
             processing_time = time.time() - start_time
             
-            return {
+            result = {
                 "explanation": explanation,
                 "input_text": text,
                 "model": settings.AI_MODEL,
                 "processing_time": round(processing_time, 3),
                 "success": True
             }
+            
+            # Cache the result
+            cache_service.set_ai_explanation(text_hash, result)
+            
+            return result
         
         except Exception as e:
             processing_time = time.time() - start_time

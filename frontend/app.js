@@ -1,170 +1,449 @@
-// ClassSight Frontend Logic
+// ClassSight Frontend Logic - Phase 5
+// Features: WebSocket, Auto-Capture, History, Keyboard Shortcuts
 
-// Configuration
-const API_URL = '/api/ocr/analyze';
-const VIDEO_FEED_ID = 'video-feed';
-const captureCanvas = document.getElementById('capture-canvas');
+// ==================== Configuration ====================
+const getWsUrl = () => {
+    if (window.location.protocol === 'file:') {
+        return 'ws://localhost:8000/api/ws/stream';
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/api/ws/stream`;
+};
 
-// DOM Elements
-const analyzeBtn = document.getElementById('analyze-btn');
-const ocrContent = document.getElementById('ocr-content');
-const aiContent = document.getElementById('ai-content');
-const videoElement = document.getElementById(VIDEO_FEED_ID);
+const CONFIG = {
+    WS_URL: getWsUrl(),
+    API_URL: '/api/ocr/analyze',
+    DEFAULT_INTERVAL: 5000,
+    HISTORY_KEY: 'classsight_history_v1'
+};
 
-// State
-let isProcessing = false;
+// ==================== State Management ====================
+const state = {
+    isProcessing: false,
+    isAutoCapture: false,
+    captureInterval: CONFIG.DEFAULT_INTERVAL,
+    intervalId: null,
+    ws: null,
+    history: [],
+    isConnected: false
+};
 
-// Initialize
+// ==================== DOM Elements ====================
+const els = {
+    video: document.getElementById('video-feed'),
+    canvas: document.getElementById('capture-canvas'),
+    ocrContent: document.getElementById('ocr-content'),
+    aiContent: document.getElementById('ai-content'),
+    analyzeBtn: document.getElementById('analyze-btn'),
+    autoToggle: document.getElementById('auto-capture-toggle'),
+    intervalSelect: document.getElementById('capture-interval'),
+    statusBadge: document.getElementById('status-badge'),
+    statusText: document.getElementById('status-text'),
+    statusDot: document.querySelector('.status-dot'),
+    historyList: document.getElementById('history-list'),
+    clearHistoryBtn: document.getElementById('clear-history-btn'),
+    downloadBtn: document.getElementById('download-report-btn'),
+    mockModeBtn: document.getElementById('mock-mode-btn'), // New Button
+    liveIndicator: document.getElementById('live-indicator'),
+    confidenceBadge: document.getElementById('confidence-badge'),
+    aiModelBadge: document.getElementById('ai-model-badge')
+};
+
+// ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("ClassSight Frontend Ready 🚀");
+    console.log("ClassSight Phase 5 Initializing 🚀");
 
-    // Start Webcam
+    // Load History
+    loadHistory();
+
+    // Initialize Camera
     await initCamera();
 
-    // Attach event listeners
-    analyzeBtn.addEventListener('click', analyzeCurrentFrame);
+    // Initialize WebSocket
+    connectWebSocket();
+
+    // Attach Event Listeners
+    setupEventListeners();
+
+    // Update UI Status
+    updateStatus("Ready", "ready");
 });
 
-/**
- * Initialize Webcam
- */
+// ==================== WebSocket Management ====================
+function connectWebSocket() {
+    updateStatus("Connecting...", "connecting");
+
+    state.ws = new WebSocket(CONFIG.WS_URL);
+
+    state.ws.onopen = () => {
+        console.log("WS Connected ✅");
+        state.isConnected = true;
+        updateStatus("Live", "live");
+
+        // Re-enable controls
+        els.analyzeBtn.disabled = false;
+    };
+
+    state.ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        handleWSMessage(message);
+    };
+
+    state.ws.onclose = () => {
+        console.log("WS Disconnected ❌");
+        state.isConnected = false;
+        updateStatus("Disconnected", "error");
+
+        // Disable controls
+        els.analyzeBtn.disabled = true;
+
+        // Try reconnecting after 3s
+        setTimeout(connectWebSocket, 3000);
+    };
+
+    state.ws.onerror = (error) => {
+        console.error("WS Error:", error);
+    };
+}
+
+function handleWSMessage(msg) {
+    if (msg.type === 'status') {
+        // Optional: show processing indicator
+    } else if (msg.type === 'ocr_result') {
+        // Show OCR immediately (progressive loading)
+        renderOCR(msg.data);
+    } else if (msg.type === 'ai_result') {
+        // Show AI when ready
+        renderAI(msg.data);
+    } else if (msg.type === 'complete') {
+        // Full result available
+        state.isProcessing = false;
+        addToHistory(msg.data);
+        renderComplete(msg.data);
+
+        if (!state.isAutoCapture) {
+            setLoadingState(false);
+        }
+    } else if (msg.type === 'error') {
+        showError(msg.message);
+        state.isProcessing = false;
+        setLoadingState(false);
+    } else if (msg.type === 'result' && msg.source === 'cache') {
+        // Cached result
+        console.log("Using cached result");
+        state.isProcessing = false;
+        renderComplete(msg.data);
+        setLoadingState(false);
+    }
+}
+
+// ==================== Mock Mode Logic ====================
+function triggerMockAnalysis() {
+    console.log("Triggering Mock Analysis 🧪");
+    setLoadingState(true);
+    state.isProcessing = true;
+
+    // Simulate network delay
+    setTimeout(() => {
+        // 1. Simulate OCR
+        const mockOCR = {
+            type: 'ocr_result',
+            data: {
+                combined_text: "E = mc²\nTheory of Relativity",
+                confidence: 0.99
+            }
+        };
+        handleWSMessage(mockOCR);
+
+        // 2. Simulate AI delay
+        setTimeout(() => {
+            const mockComplete = {
+                type: 'complete',
+                data: {
+                    combined_text: "E = mc²\nTheory of Relativity",
+                    confidence: 0.99,
+                    explanation: "This equation represents the mass-energy equivalence, introduced by Albert Einstein. \nE represents energy, m represents mass, and c is the speed of light.",
+                    ai_model: "Mock Gemini",
+                    timestamp: Date.now() / 1000
+                }
+            };
+            handleWSMessage(mockComplete);
+            state.isProcessing = false;
+        }, 1500);
+
+    }, 800);
+}
+
+// ==================== Camera & Capture ====================
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
-                facingMode: 'environment' // Prefer back camera on mobile
+                facingMode: 'environment'
             }
         });
-        videoElement.srcObject = stream;
-        console.log("Webcam started successfully");
+        els.video.srcObject = stream;
     } catch (error) {
-        console.error("Camera access denied:", error);
-        showError("Camera access denied. Please allow camera permissions.");
-        // Fallback or specific UI handling could go here
+        console.error("Camera Error:", error);
+        showError("Camera access denied. Please check permissions.");
     }
 }
 
-/**
- * Capture current frame and send to backend for analysis
- */
-async function analyzeCurrentFrame() {
-    if (isProcessing) return;
+async function captureFrame() {
+    if (!state.isConnected || state.isProcessing) return;
 
-    setLoadingState(true);
+    // Only set loading UI if manual capture
+    if (!state.isAutoCapture) {
+        setLoadingState(true);
+    }
+
+    state.isProcessing = true;
 
     try {
-        // 1. Capture frame from video to canvas
-        captureCanvas.width = videoElement.videoWidth;
-        captureCanvas.height = videoElement.videoHeight;
+        // Draw frame to canvas
+        els.canvas.width = els.video.videoWidth;
+        els.canvas.height = els.video.videoHeight;
+        const ctx = els.canvas.getContext('2d');
+        ctx.drawImage(els.video, 0, 0);
 
-        const context = captureCanvas.getContext('2d');
-        context.drawImage(videoElement, 0, 0, captureCanvas.width, captureCanvas.height);
-
-        // 2. Convert canvas to blob
-        const imageBlob = await new Promise(resolve => captureCanvas.toBlob(resolve, 'image/png'));
-
-        // 3. Prepare form data
-        const formData = new FormData();
-        formData.append('file', imageBlob, 'capture.png');
-
-        // 4. Send to API
-        console.log("Sending frame to backend...");
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log("Analysis Result:", data);
-
-        // 5. Update UI
-        updateUI(data);
+        // Convert to Blob
+        els.canvas.toBlob((blob) => {
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                state.ws.send(blob);
+            } else {
+                console.error("WS not open");
+                state.isProcessing = false;
+                setLoadingState(false);
+            }
+        }, 'image/jpeg', 0.8); // Compress JPEG 0.8 quality
 
     } catch (error) {
-        console.error("Analysis Failed:", error);
-        showError(error.message);
-    } finally {
+        console.error("Capture Error:", error);
+        state.isProcessing = false;
         setLoadingState(false);
     }
 }
 
-/**
- * Update the UI with results
- */
-function updateUI(data) {
-    // Update OCR Section
-    if (data.combined_text) {
-        ocrContent.innerHTML = `<div class="ocr-text">${escapeHtml(data.combined_text)}</div>`;
-        document.getElementById('confidence-badge').style.display = 'inline-block';
-        document.getElementById('confidence-badge').textContent = `${Math.round(data.confidence * 100)}% Match`;
+// ==================== Auto-Capture Logic ====================
+function toggleAutoCapture(enabled) {
+    state.isAutoCapture = enabled;
+
+    if (enabled) {
+        // Clean start
+        if (state.intervalId) clearInterval(state.intervalId);
+
+        // Immediate first capture
+        captureFrame();
+
+        // Start loop
+        state.intervalId = setInterval(captureFrame, state.captureInterval);
+
+        els.statusBadge.classList.add('pulse-active');
+        els.liveIndicator.style.display = 'flex';
+        els.analyzeBtn.disabled = true;
+        els.analyzeBtn.innerHTML = '<span class="btn-icon">🔄</span> Auto Mode';
     } else {
-        ocrContent.innerHTML = '<div class="placeholder-text">No text detected in this frame.</div>';
-    }
+        // Stop loop
+        if (state.intervalId) clearInterval(state.intervalId);
+        state.intervalId = null;
 
-    // Update AI Section
-    if (data.explanation) {
-        // Format the explanation (convert newlines to paragraphs)
-        const formattedExplanation = data.explanation
-            .split('\n')
-            .filter(line => line.trim() !== '')
-            .map(line => `<p>${escapeHtml(line)}</p>`)
-            .join('');
-
-        aiContent.innerHTML = `<div class="ai-explanation">${formattedExplanation}</div>`;
-
-        if (data.ai_model) {
-            document.getElementById('ai-model-badge').textContent = data.ai_model;
-        }
-    } else {
-        aiContent.innerHTML = '<div class="placeholder-text">No explanation generated.</div>';
+        els.statusBadge.classList.remove('pulse-active');
+        els.liveIndicator.style.display = 'none';
+        els.analyzeBtn.disabled = false;
+        els.analyzeBtn.innerHTML = '<span class="btn-icon">⚡</span> Capture';
     }
 }
 
-/**
- * Show loading skeletons
- */
+// ==================== UI Rendering ====================
+function renderOCR(data) {
+    if (data.combined_text) {
+        els.ocrContent.innerHTML = `<div class="ocr-text">${escapeHtml(data.combined_text)}</div>`;
+        els.confidenceBadge.style.display = 'inline-block';
+        els.confidenceBadge.textContent = `${Math.round(data.confidence * 100)}% Match`;
+    } else {
+        els.ocrContent.innerHTML = '<div class="placeholder-text">No text visible</div>';
+    }
+}
+
+function renderAI(data) {
+    if (data.explanation) {
+        const formatted = formatExplanation(data.explanation);
+        els.aiContent.innerHTML = `<div class="ai-explanation">${formatted}</div>`;
+        if (data.ai_model) els.aiModelBadge.textContent = data.ai_model;
+    }
+}
+
+function renderComplete(data) {
+    renderOCR(data);
+    renderAI(data);
+}
+
 function setLoadingState(loading) {
-    isProcessing = loading;
-    analyzeBtn.disabled = loading;
-    analyzeBtn.innerHTML = loading ?
+    els.analyzeBtn.disabled = loading;
+    els.analyzeBtn.innerHTML = loading ?
         '<span class="btn-icon">⏳</span> Analyzing...' :
-        '<span class="btn-icon">⚡</span> Analyze Frame';
+        '<span class="btn-icon">⚡</span> Capture';
 
     if (loading) {
-        // Show shimmer effect in AI panel
-        aiContent.innerHTML = `
+        // Show skeleton loader for AI
+        els.aiContent.innerHTML = `
             <div class="ai-loading">
-                <div class="shimmer-line"></div>
-                <div class="shimmer-line"></div>
-                <div class="shimmer-line medium"></div>
-                <div class="shimmer-line short"></div>
+                <div class="skeleton-text"></div>
+                <div class="skeleton-text"></div>
+                <div class="skeleton-text medium"></div>
+                <div class="skeleton-text short"></div>
             </div>
         `;
     }
 }
 
-/**
- * Show error message
- */
-function showError(message) {
-    aiContent.innerHTML = `
+function updateStatus(text, type) {
+    els.statusText.textContent = text;
+    // Reset classes
+    els.statusDot.className = 'status-dot';
+
+    if (type === 'live') els.statusDot.style.background = '#10b981'; // Green
+    else if (type === 'connecting') els.statusDot.style.background = '#f59e0b'; // Yellow
+    else if (type === 'error') els.statusDot.style.background = '#ef4444'; // Red
+}
+
+function showError(msg) {
+    els.aiContent.innerHTML = `
         <div style="color: #ef4444; text-align: center; margin-top: 1rem;">
-            ⚠️ ${escapeHtml(message)}
+            ⚠️ ${escapeHtml(msg)}
         </div>
     `;
 }
 
-/**
- * Safety utility
- */
+// ==================== History Management ====================
+function loadHistory() {
+    const stored = localStorage.getItem(CONFIG.HISTORY_KEY);
+    if (stored) {
+        state.history = JSON.parse(stored);
+        renderHistoryList();
+    }
+}
+
+function addToHistory(item) {
+    // Add to top, max 50 items
+    state.history.unshift(item);
+    if (state.history.length > 50) state.history.pop();
+
+    localStorage.setItem(CONFIG.HISTORY_KEY, JSON.stringify(state.history));
+    renderHistoryList();
+}
+
+function renderHistoryList() {
+    if (state.history.length === 0) {
+        els.historyList.innerHTML = '<div class="empty-state">No history yet</div>';
+        return;
+    }
+
+    els.historyList.innerHTML = state.history.map((item, index) => `
+        <div class="history-item" onclick="replayHistory(${index})">
+            <div class="history-time">${new Date(item.timestamp * 1000).toLocaleTimeString()}</div>
+            <div class="history-preview">${escapeHtml(item.combined_text || "No Text")}</div>
+        </div>
+    `).join('');
+}
+
+window.replayHistory = (index) => {
+    const item = state.history[index];
+    if (item) {
+        // Disable auto capture if viewing history
+        if (state.isAutoCapture) {
+            els.autoToggle.checked = false;
+            toggleAutoCapture(false);
+        }
+
+        renderComplete(item);
+    }
+};
+
+function clearHistory() {
+    if (confirm("Clear all session history?")) {
+        state.history = [];
+        localStorage.removeItem(CONFIG.HISTORY_KEY);
+        renderHistoryList();
+    }
+}
+
+function downloadReport() {
+    if (state.history.length === 0) return alert("No history to export");
+
+    const report = {
+        session_date: new Date().toISOString(),
+        total_items: state.history.length,
+        items: state.history
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `classsight-report-${Date.now()}.json`;
+    a.click();
+}
+
+// ==================== Utilities ====================
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function formatExplanation(text) {
+    return text.split('\n')
+        .filter(line => line.trim())
+        .map(line => `<p>${escapeHtml(line)}</p>`)
+        .join('');
+}
+
+// ==================== Event Listeners ====================
+function setupEventListeners() {
+    // Manual Capture
+    els.analyzeBtn.addEventListener('click', captureFrame);
+
+    // Mock Mode
+    if (els.mockModeBtn) {
+        els.mockModeBtn.addEventListener('click', triggerMockAnalysis);
+    }
+
+    // Auto Capture Toggle
+    els.autoToggle.addEventListener('change', (e) => {
+        toggleAutoCapture(e.target.checked);
+    });
+
+    // Interval Change
+    els.intervalSelect.addEventListener('change', (e) => {
+        state.captureInterval = parseInt(e.target.value);
+        if (state.isAutoCapture) {
+            // Restart with new interval
+            toggleAutoCapture(true);
+        }
+    });
+
+    // History Controls
+    els.clearHistoryBtn.addEventListener('click', clearHistory);
+    els.downloadBtn.addEventListener('click', downloadReport);
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return; // Ignore if typing
+
+        switch (e.key.toLowerCase()) {
+            case ' ':
+            case 'enter':
+                e.preventDefault();
+                captureFrame();
+                break;
+            case 'a':
+                els.autoToggle.checked = !els.autoToggle.checked;
+                toggleAutoCapture(els.autoToggle.checked);
+                break;
+            // 'h' could toggle sidebar visibility in future
+        }
+    });
 }

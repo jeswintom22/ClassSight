@@ -89,6 +89,17 @@ class Settings:
     AI_MODEL: str = os.getenv("AI_MODEL", "gemini-flash-latest")  # Points to latest Flash model
     AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
     AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))
+
+    # ==================== Caching Settings ====================
+    CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "True").lower() == "true"
+    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "300"))  # 5 minutes
+    CACHE_MAX_SIZE: int = int(os.getenv("CACHE_MAX_SIZE", "1000"))
+
+    # ==================== WebSocket Settings ====================
+    WS_HEARTBEAT_INTERVAL: int = int(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
+
+    # ==================== Auto-Capture Settings ====================
+    AUTO_CAPTURE_INTERVAL: int = int(os.getenv("AUTO_CAPTURE_INTERVAL", "5"))
     
     def validate(self) -> bool:
         """

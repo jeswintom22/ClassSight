@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClassSight | AI Classroom Assistant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,74 +13,120 @@
 
 <body>
     <div class="app-container">
-        <!-- Header -->
-        <header class="glass-header">
-            <div class="logo">
-                <span class="logo-icon">👁️</span>
-                <h1>ClassSight</h1>
+        <!-- Sidebar: Session History -->
+        <aside class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <h3>🕒 History</h3>
+                <button id="clear-history-btn" class="icon-btn" title="Clear History">🗑️</button>
             </div>
-            <div class="status-badge" id="status-badge">
-                <span class="status-dot"></span>
-                <span id="status-text">Live</span>
+            <div class="history-list" id="history-list">
+                <!-- History items will be injected here -->
+                <div class="empty-state">No history yet</div>
             </div>
-        </header>
+            <div class="sidebar-footer">
+                <button id="download-report-btn" class="secondary-btn">
+                    📥 Export Report
+                </button>
+            </div>
+        </aside>
 
-        <!-- Main Content -->
-        <main class="main-grid">
-            <!-- Left Panel: Video Stream -->
-            <section class="video-panel glass-panel">
-                <div class="panel-header">
-                    <h2>Live Classroom Feed</h2>
-                    <button id="analyze-btn" class="action-btn">
-                        <span class="btn-icon">⚡</span> Analyze Frame
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="glass-header">
+                <div class="logo">
+                    <span class="logo-icon">👁️</span>
+                    <h1>ClassSight</h1>
+                </div>
+
+                <div class="controls-area">
+                    <!-- Test Button (Moved here for visibility) -->
+                    <button id="mock-mode-btn" class="secondary-btn"
+                        style="padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-right: 1rem;">
+                        🧪 Test Mock
                     </button>
-                </div>
 
-                <div class="video-container">
-                    <!-- Live Webcam Stream -->
-                    <video id="video-feed" autoplay playsinline muted></video>
-                    <canvas id="capture-canvas" style="display: none;"></canvas>
+                    <!-- Auto Capture Toggle -->
+                    <div class="auto-capture-control">
+                        <label class="switch">
+                            <input type="checkbox" id="auto-capture-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="control-label">Auto-Capture</span>
+                        <select id="capture-interval" class="interval-select">
+                            <option value="3000">3s</option>
+                            <option value="5000" selected>5s</option>
+                            <option value="10000">10s</option>
+                        </select>
+                    </div>
 
-                    <div class="overlay">
-                        <div class="recording-indicator">
-                            <div class="red-dot"></div> LIVE CAM
-                        </div>
+                    <div class="status-badge" id="status-badge">
+                        <span class="status-dot"></span>
+                        <span id="status-text">Ready</span>
                     </div>
                 </div>
-            </section>
+            </header>
 
-            <!-- Right Panel: Knowledge Board -->
-            <section class="knowledge-panel">
-                <!-- Top Half: OCR Text -->
-                <div class="ocr-section glass-panel">
+            <!-- Content Grid -->
+            <div class="content-grid">
+                <!-- Left Panel: Video Stream -->
+                <section class="video-panel glass-panel">
                     <div class="panel-header">
-                        <h2>📝 Live Notes</h2>
-                        <span class="confidence-badge" id="confidence-badge" style="display: none;">98% Match</span>
-                    </div>
-                    <div class="content-scrollable" id="ocr-content">
-                        <div class="placeholder-text">
-                            Waiting for board content...
+                        <h2>Live Feed</h2>
+                        <div class="video-controls">
+                            <button id="analyze-btn" class="action-btn">
+                                <span class="btn-icon">⚡</span> Capture
+                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Bottom Half: AI Explanation -->
-                <div class="ai-section glass-panel">
-                    <div class="panel-header">
-                        <h2>🤖 AI Teacher</h2>
-                        <span class="ai-model-badge" id="ai-model-badge">Gemini Flash</span>
-                    </div>
-                    <div class="content-scrollable" id="ai-content">
-                        <div class="placeholder-text">
-                            AI insights will appear here...
+                    <div class="video-container">
+                        <video id="video-feed" autoplay playsinline muted></video>
+                        <canvas id="capture-canvas" style="display: none;"></canvas>
+
+                        <!-- Real-time overlay -->
+                        <div class="overlay">
+                            <div class="recording-indicator" id="live-indicator">
+                                <span class="red-dot"></span> LIVE
+                            </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
+
+                <!-- Right Panel: Knowledge Board -->
+                <section class="knowledge-panel">
+                    <!-- Top Half: OCR Text -->
+                    <div class="ocr-section glass-panel">
+                        <div class="panel-header">
+                            <h2>📝 Board Text</h2>
+                            <span class="confidence-badge" id="confidence-badge" style="display: none;">98% Match</span>
+                        </div>
+                        <div class="content-scrollable" id="ocr-content">
+                            <div class="placeholder-text">
+                                Waiting for content...
+                                <br><small>Press SPACE to capture</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Half: AI Explanation -->
+                    <div class="ai-section glass-panel">
+                        <div class="panel-header">
+                            <h2>🤖 AI Teacher</h2>
+                            <span class="ai-model-badge" id="ai-model-badge">Gemini Flash</span>
+                        </div>
+                        <div class="content-scrollable" id="ai-content">
+                            <div class="placeholder-text">
+                                AI insights will appear here...
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2.0"></script>
 </body>
 
 </html>
