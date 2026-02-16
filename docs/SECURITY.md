@@ -1,8 +1,10 @@
 # ClassSight Security Guide
 
+**Maintainer**: Jeswin Tom (jeswintom8@gmail.com)
+
 ## 🔒 Security Overview
 
-This document outlines the security measures implemented in ClassSight and best practices for maintaining a secure deployment.
+This document outlines the security measures implemented in ClassSight and best practices for maintaining a secure deployment. For security-related questions or to report vulnerabilities, please contact the maintainer.
 
 ## Implemented Security Features
 

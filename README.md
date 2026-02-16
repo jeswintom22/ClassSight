@@ -51,5 +51,12 @@ uvicorn main:app --reload
 Visit: [http://localhost:8000](http://localhost:8000)
 
 ## 📄 Documentation
-- [Enhancement Walkthrough](walkthrough.md) - Detailed phase update notes.
-- [Commit History](COMMIT_MESSAGE.txt) - Summary of latest changes.
+- [Architecture Guide](docs/ARCHITECTURE.md) - System design and component breakdown
+- [Security Guide](docs/SECURITY.md) - Security features and best practices
+
+## 📞 Contact & Support
+
+**Maintainer**: Jeswin Tom  
+**Email**: jeswintom8@gmail.com
+
+For issues, suggestions, or contributions, please reach out via email.
