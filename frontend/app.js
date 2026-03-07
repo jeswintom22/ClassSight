@@ -1,23 +1,21 @@
-// ClassSight Frontend Logic - Phase 5
-// Features: WebSocket, Auto-Capture, History, Keyboard Shortcuts
+// ClassSight Frontend Logic — Phase 6 (UI/UX Overhaul)
+// Features: WebSocket, Auto-Capture, History, Toasts, Ripple, Sidebar Toggle, Smart AI Formatting
 
 // ==================== Configuration ====================
 const getWsUrl = () => {
-    if (window.location.protocol === 'file:') {
-        return 'ws://localhost:8000/api/ws/stream';
-    }
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/api/ws/stream`;
+    if (window.location.protocol === 'file:') return 'ws://localhost:8000/api/ws/stream';
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/api/ws/stream`;
 };
 
 const CONFIG = {
     WS_URL: getWsUrl(),
-    API_URL: '/api/ocr/analyze',
     DEFAULT_INTERVAL: 5000,
-    HISTORY_KEY: 'classsight_history_v1'
+    HISTORY_KEY: 'classsight_history_v2',
+    MAX_HISTORY: 50
 };
 
-// ==================== State Management ====================
+// ==================== State ====================
 const state = {
     isProcessing: false,
     isAutoCapture: false,
@@ -25,234 +23,221 @@ const state = {
     intervalId: null,
     ws: null,
     history: [],
-    isConnected: false
+    isConnected: false,
+    captureCount: 0,
+    sessionStart: Date.now(),
+    sidebarOpen: true
 };
 
 // ==================== DOM Elements ====================
 const els = {
-    video: document.getElementById('video-feed'),
-    canvas: document.getElementById('capture-canvas'),
-    ocrContent: document.getElementById('ocr-content'),
-    aiContent: document.getElementById('ai-content'),
-    analyzeBtn: document.getElementById('analyze-btn'),
-    autoToggle: document.getElementById('auto-capture-toggle'),
-    intervalSelect: document.getElementById('capture-interval'),
-    statusBadge: document.getElementById('status-badge'),
-    statusText: document.getElementById('status-text'),
-    statusDot: document.querySelector('.status-dot'),
-    historyList: document.getElementById('history-list'),
+    video:           document.getElementById('video-feed'),
+    canvas:          document.getElementById('capture-canvas'),
+    ocrContent:      document.getElementById('ocr-content'),
+    aiContent:       document.getElementById('ai-content'),
+    analyzeBtn:      document.getElementById('analyze-btn'),
+    autoToggle:      document.getElementById('auto-capture-toggle'),
+    intervalSelect:  document.getElementById('capture-interval'),
+    statusBadge:     document.getElementById('status-badge'),
+    statusText:      document.getElementById('status-text'),
+    statusDot:       document.querySelector('#status-badge .status-dot'),
+    historyList:     document.getElementById('history-list'),
     clearHistoryBtn: document.getElementById('clear-history-btn'),
-    downloadBtn: document.getElementById('download-report-btn'),
-    mockModeBtn: document.getElementById('mock-mode-btn'), // New Button
-    liveIndicator: document.getElementById('live-indicator'),
+    downloadBtn:     document.getElementById('download-report-btn'),
+    mockModeBtn:     document.getElementById('mock-mode-btn'),
+    liveIndicator:   document.getElementById('live-indicator'),
+    scanLine:        document.getElementById('scan-line'),
     confidenceBadge: document.getElementById('confidence-badge'),
-    aiModelBadge: document.getElementById('ai-model-badge')
+    aiModelBadge:    document.getElementById('ai-model-badge'),
+    toastContainer:  document.getElementById('toast-container'),
+    captureFlash:    document.getElementById('capture-flash'),
+    captureCount:    document.getElementById('capture-count'),
+    sidebar:         document.getElementById('sidebar'),
+    sidebarToggle:   document.getElementById('sidebar-toggle'),
+    videoPH:         document.getElementById('video-placeholder'),
+    footerWS:        document.getElementById('footer-ws-status'),
+    footerWSDot:     document.querySelector('#footer-ws-status .status-dot-sm'),
+    footerSession:   document.getElementById('footer-session-time')
 };
 
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("ClassSight Phase 5 Initializing 🚀");
+    console.log('ClassSight Phase 6 Initializing 🚀');
 
-    // Load History
     loadHistory();
-
-    // Initialize Camera
     await initCamera();
-
-    // Initialize WebSocket
     connectWebSocket();
-
-    // Attach Event Listeners
     setupEventListeners();
-
-    // Update UI Status
-    updateStatus("Ready", "ready");
+    updateStatus('Ready', 'ready');
+    startSessionTimer();
 });
 
-// ==================== WebSocket Management ====================
+// ==================== Session Timer ====================
+function startSessionTimer() {
+    setInterval(() => {
+        const mins = Math.floor((Date.now() - state.sessionStart) / 60000);
+        if (els.footerSession) els.footerSession.textContent = `Session: ${mins}m`;
+    }, 10000);
+}
+
+// ==================== WebSocket ====================
 function connectWebSocket() {
-    updateStatus("Connecting...", "connecting");
+    updateStatus('Connecting…', 'connecting');
 
     state.ws = new WebSocket(CONFIG.WS_URL);
 
     state.ws.onopen = () => {
-        console.log("WS Connected ✅");
+        console.log('WS Connected ✅');
         state.isConnected = true;
-        updateStatus("Live", "live");
-
-        // Re-enable controls
+        updateStatus('Live', 'live');
         els.analyzeBtn.disabled = false;
+        showToast('Connected to server', 'success');
     };
 
     state.ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        handleWSMessage(message);
+        handleWSMessage(JSON.parse(event.data));
     };
 
     state.ws.onclose = () => {
-        console.log("WS Disconnected ❌");
+        console.log('WS Disconnected ❌');
         state.isConnected = false;
-        updateStatus("Disconnected", "error");
-
-        // Disable controls
+        updateStatus('Disconnected', 'error');
         els.analyzeBtn.disabled = true;
-
-        // Try reconnecting after 3s
         setTimeout(connectWebSocket, 3000);
     };
 
-    state.ws.onerror = (error) => {
-        console.error("WS Error:", error);
-    };
+    state.ws.onerror = (err) => console.error('WS Error:', err);
 }
 
 function handleWSMessage(msg) {
-    if (msg.type === 'status') {
-        // Optional: show processing indicator
-    } else if (msg.type === 'ocr_result') {
-        // Show OCR immediately (progressive loading)
+    if (msg.type === 'ocr_result') {
         renderOCR(msg.data);
     } else if (msg.type === 'ai_result') {
-        // Show AI when ready
         renderAI(msg.data);
     } else if (msg.type === 'complete') {
-        // Full result available
         state.isProcessing = false;
         addToHistory(msg.data);
         renderComplete(msg.data);
-
-        if (!state.isAutoCapture) {
-            setLoadingState(false);
-        }
+        if (!state.isAutoCapture) setLoadingState(false);
+        showToast('Analysis complete', 'success');
     } else if (msg.type === 'error') {
         showError(msg.message);
         state.isProcessing = false;
         setLoadingState(false);
+        showToast(msg.message || 'Analysis failed', 'error');
     } else if (msg.type === 'result' && msg.source === 'cache') {
-        // Cached result
-        console.log("Using cached result");
         state.isProcessing = false;
         renderComplete(msg.data);
         setLoadingState(false);
+        showToast('Loaded from cache', 'info');
     }
 }
 
-// ==================== Mock Mode Logic ====================
+// ==================== Mock Mode ====================
 function triggerMockAnalysis() {
-    console.log("Triggering Mock Analysis 🧪");
+    console.log('Triggering Mock Analysis 🧪');
+    flashCapture();
     setLoadingState(true);
     state.isProcessing = true;
+    showToast('Running test analysis…', 'info');
 
-    // Simulate network delay
     setTimeout(() => {
-        // 1. Simulate OCR
-        const mockOCR = {
+        handleWSMessage({
             type: 'ocr_result',
-            data: {
-                combined_text: "E = mc²\nTheory of Relativity",
-                confidence: 0.99
-            }
-        };
-        handleWSMessage(mockOCR);
+            data: { combined_text: 'E = mc²\nTheory of Relativity\n\n∫ f(x) dx = F(b) − F(a)', confidence: 0.99 }
+        });
 
-        // 2. Simulate AI delay
         setTimeout(() => {
-            const mockComplete = {
+            handleWSMessage({
                 type: 'complete',
                 data: {
-                    combined_text: "E = mc²\nTheory of Relativity",
+                    combined_text: 'E = mc²\nTheory of Relativity\n\n∫ f(x) dx = F(b) − F(a)',
                     confidence: 0.99,
-                    explanation: "This equation represents the mass-energy equivalence, introduced by Albert Einstein. \nE represents energy, m represents mass, and c is the speed of light.",
-                    ai_model: "Mock Gemini",
+                    explanation: `**Mass-Energy Equivalence** is one of the most famous equations in physics.\n\nIn E = mc², E stands for energy, m for mass, and c is the speed of light (~3×10⁸ m/s).\n\nThis tells us that mass and energy are interchangeable — a tiny amount of mass can release an enormous amount of energy, which is the basis of nuclear reactions and atomic bombs.\n\nThe integral below it is the **Fundamental Theorem of Calculus**, connecting differentiation and integration.`,
+                    ai_model: 'Mock Gemini Flash',
                     timestamp: Date.now() / 1000
                 }
-            };
-            handleWSMessage(mockComplete);
+            });
             state.isProcessing = false;
         }, 1500);
-
     }, 800);
 }
 
-// ==================== Camera & Capture ====================
+// ==================== Camera ====================
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'environment'
-            }
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' }
         });
         els.video.srcObject = stream;
-    } catch (error) {
-        console.error("Camera Error:", error);
-        showError("Camera access denied. Please check permissions.");
+        els.video.addEventListener('loadeddata', () => {
+            if (els.videoPH) els.videoPH.classList.add('hidden');
+        });
+    } catch (err) {
+        console.error('Camera Error:', err);
+        showToast('Camera access denied', 'error');
     }
 }
 
 async function captureFrame() {
     if (!state.isConnected || state.isProcessing) return;
+    if (!state.isAutoCapture) setLoadingState(true);
 
-    // Only set loading UI if manual capture
-    if (!state.isAutoCapture) {
-        setLoadingState(true);
-    }
+    // Flash & counter
+    flashCapture();
+    state.captureCount++;
+    if (els.captureCount) els.captureCount.textContent = state.captureCount;
 
     state.isProcessing = true;
 
     try {
-        // Draw frame to canvas
-        els.canvas.width = els.video.videoWidth;
+        els.canvas.width  = els.video.videoWidth;
         els.canvas.height = els.video.videoHeight;
-        const ctx = els.canvas.getContext('2d');
-        ctx.drawImage(els.video, 0, 0);
+        els.canvas.getContext('2d').drawImage(els.video, 0, 0);
 
-        // Convert to Blob
         els.canvas.toBlob((blob) => {
             if (state.ws && state.ws.readyState === WebSocket.OPEN) {
                 state.ws.send(blob);
             } else {
-                console.error("WS not open");
                 state.isProcessing = false;
                 setLoadingState(false);
+                showToast('Not connected — retrying…', 'warning');
             }
-        }, 'image/jpeg', 0.8); // Compress JPEG 0.8 quality
-
-    } catch (error) {
-        console.error("Capture Error:", error);
+        }, 'image/jpeg', 0.8);
+    } catch (err) {
+        console.error('Capture Error:', err);
         state.isProcessing = false;
         setLoadingState(false);
     }
 }
 
-// ==================== Auto-Capture Logic ====================
+// ==================== Auto-Capture ====================
 function toggleAutoCapture(enabled) {
     state.isAutoCapture = enabled;
 
     if (enabled) {
-        // Clean start
         if (state.intervalId) clearInterval(state.intervalId);
-
-        // Immediate first capture
         captureFrame();
-
-        // Start loop
         state.intervalId = setInterval(captureFrame, state.captureInterval);
 
-        els.statusBadge.classList.add('pulse-active');
-        els.liveIndicator.style.display = 'flex';
+        if (els.liveIndicator) els.liveIndicator.style.display = 'flex';
+        if (els.scanLine)       els.scanLine.style.display = 'block';
         els.analyzeBtn.disabled = true;
-        els.analyzeBtn.innerHTML = '<span class="btn-icon">🔄</span> Auto Mode';
+        els.analyzeBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Auto Mode</span>`;
+        showToast(`Auto-capture every ${state.captureInterval / 1000}s`, 'info');
     } else {
-        // Stop loop
         if (state.intervalId) clearInterval(state.intervalId);
         state.intervalId = null;
 
-        els.statusBadge.classList.remove('pulse-active');
-        els.liveIndicator.style.display = 'none';
+        if (els.liveIndicator) els.liveIndicator.style.display = 'none';
+        if (els.scanLine)       els.scanLine.style.display = 'none';
         els.analyzeBtn.disabled = false;
-        els.analyzeBtn.innerHTML = '<span class="btn-icon">⚡</span> Capture';
+        els.analyzeBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Capture</span>
+            <kbd class="shortcut-hint">Space</kbd>`;
     }
 }
 
@@ -260,17 +245,20 @@ function toggleAutoCapture(enabled) {
 function renderOCR(data) {
     if (data.combined_text) {
         els.ocrContent.innerHTML = `<div class="ocr-text">${escapeHtml(data.combined_text)}</div>`;
-        els.confidenceBadge.style.display = 'inline-block';
-        els.confidenceBadge.textContent = `${Math.round(data.confidence * 100)}% Match`;
+        const conf   = Math.round(data.confidence * 100);
+        const badge  = els.confidenceBadge;
+        badge.style.display = 'inline-block';
+        badge.textContent   = `${conf}%`;
+        badge.className     = 'confidence-badge' + (conf >= 85 ? '' : conf >= 60 ? ' warn' : ' low');
     } else {
-        els.ocrContent.innerHTML = '<div class="placeholder-text">No text visible</div>';
+        els.ocrContent.innerHTML = `<div class="placeholder-text"><p>No text visible</p></div>`;
+        els.confidenceBadge.style.display = 'none';
     }
 }
 
 function renderAI(data) {
     if (data.explanation) {
-        const formatted = formatExplanation(data.explanation);
-        els.aiContent.innerHTML = `<div class="ai-explanation">${formatted}</div>`;
+        els.aiContent.innerHTML = `<div class="ai-explanation">${formatExplanation(data.explanation)}</div>`;
         if (data.ai_model) els.aiModelBadge.textContent = data.ai_model;
     }
 }
@@ -282,42 +270,89 @@ function renderComplete(data) {
 
 function setLoadingState(loading) {
     els.analyzeBtn.disabled = loading;
-    els.analyzeBtn.innerHTML = loading ?
-        '<span class="btn-icon">⏳</span> Analyzing...' :
-        '<span class="btn-icon">⚡</span> Capture';
+    els.analyzeBtn.innerHTML = loading
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Analyzing…</span>`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Capture</span><kbd class="shortcut-hint">Space</kbd>`;
 
     if (loading) {
-        // Show skeleton loader for AI
         els.aiContent.innerHTML = `
             <div class="ai-loading">
                 <div class="skeleton-text"></div>
-                <div class="skeleton-text"></div>
                 <div class="skeleton-text medium"></div>
+                <div class="skeleton-text"></div>
                 <div class="skeleton-text short"></div>
-            </div>
-        `;
+                <div class="skeleton-text medium"></div>
+            </div>`;
     }
 }
 
+// Inject spin keyframe dynamically (lightweight)
+const spinStyle = document.createElement('style');
+spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+document.head.appendChild(spinStyle);
+
 function updateStatus(text, type) {
     els.statusText.textContent = text;
-    // Reset classes
-    els.statusDot.className = 'status-dot';
+    const dot = els.statusDot;
+    dot.className = 'status-dot';
+    if (type === 'live')       { dot.classList.add('is-live');       }
+    else if (type === 'connecting') { dot.classList.add('is-connecting'); }
+    else if (type === 'error') { dot.classList.add('is-error');      }
 
-    if (type === 'live') els.statusDot.style.background = '#10b981'; // Green
-    else if (type === 'connecting') els.statusDot.style.background = '#f59e0b'; // Yellow
-    else if (type === 'error') els.statusDot.style.background = '#ef4444'; // Red
+    // Mirror to footer
+    if (els.footerWSDot) {
+        els.footerWSDot.className = 'status-dot-sm';
+        if (type === 'live')       els.footerWSDot.classList.add('is-live');
+        else if (type === 'error') els.footerWSDot.classList.add('is-error');
+        else if (type === 'connecting') els.footerWSDot.classList.add('is-connecting');
+    }
 }
 
 function showError(msg) {
     els.aiContent.innerHTML = `
-        <div style="color: #ef4444; text-align: center; margin-top: 1rem;">
-            ⚠️ ${escapeHtml(msg)}
-        </div>
-    `;
+        <div class="placeholder-text" style="color:#ef4444;opacity:1;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <p style="color:#ef4444;">${escapeHtml(msg)}</p>
+        </div>`;
 }
 
-// ==================== History Management ====================
+// ==================== Toast Notifications ====================
+function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span class="toast-icon"></span><span>${escapeHtml(message)}</span>`;
+    els.toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('dismiss');
+        setTimeout(() => toast.remove(), 350);
+    }, duration);
+}
+
+// ==================== Capture Flash ====================
+function flashCapture() {
+    const el = els.captureFlash;
+    el.classList.remove('flash');
+    void el.offsetWidth; // reflow
+    el.classList.add('flash');
+}
+
+// ==================== Ripple on Buttons ====================
+function addRipple(btn) {
+    btn.addEventListener('click', function (e) {
+        const rect  = this.getBoundingClientRect();
+        const size  = Math.max(rect.width, rect.height);
+        const x     = e.clientX - rect.left - size / 2;
+        const y     = e.clientY - rect.top  - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px;`;
+        this.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+    });
+}
+
+// ==================== History ====================
 function loadHistory() {
     const stored = localStorage.getItem(CONFIG.HISTORY_KEY);
     if (stored) {
@@ -327,123 +362,150 @@ function loadHistory() {
 }
 
 function addToHistory(item) {
-    // Add to top, max 50 items
     state.history.unshift(item);
-    if (state.history.length > 50) state.history.pop();
-
+    if (state.history.length > CONFIG.MAX_HISTORY) state.history.pop();
     localStorage.setItem(CONFIG.HISTORY_KEY, JSON.stringify(state.history));
     renderHistoryList();
 }
 
 function renderHistoryList() {
-    if (state.history.length === 0) {
-        els.historyList.innerHTML = '<div class="empty-state">No history yet</div>';
+    if (!state.history.length) {
+        els.historyList.innerHTML = `
+            <div class="empty-state">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p>No captures yet</p>
+                <small>Press <kbd>Space</kbd> to start</small>
+            </div>`;
         return;
     }
 
-    els.historyList.innerHTML = state.history.map((item, index) => `
-        <div class="history-item" onclick="replayHistory(${index})">
+    els.historyList.innerHTML = state.history.map((item, i) => `
+        <div class="history-item" onclick="replayHistory(${i})">
             <div class="history-time">${new Date(item.timestamp * 1000).toLocaleTimeString()}</div>
-            <div class="history-preview">${escapeHtml(item.combined_text || "No Text")}</div>
-        </div>
-    `).join('');
+            <div class="history-preview">${escapeHtml(item.combined_text || 'No Text')}</div>
+        </div>`).join('');
 }
 
 window.replayHistory = (index) => {
     const item = state.history[index];
-    if (item) {
-        // Disable auto capture if viewing history
-        if (state.isAutoCapture) {
-            els.autoToggle.checked = false;
-            toggleAutoCapture(false);
-        }
-
-        renderComplete(item);
+    if (!item) return;
+    if (state.isAutoCapture) {
+        els.autoToggle.checked = false;
+        toggleAutoCapture(false);
     }
+    renderComplete(item);
+    showToast('Loaded from history', 'info');
 };
 
 function clearHistory() {
-    if (confirm("Clear all session history?")) {
-        state.history = [];
-        localStorage.removeItem(CONFIG.HISTORY_KEY);
-        renderHistoryList();
-    }
+    if (!confirm('Clear all session history?')) return;
+    state.history = [];
+    localStorage.removeItem(CONFIG.HISTORY_KEY);
+    renderHistoryList();
+    showToast('History cleared', 'info');
 }
 
 function downloadReport() {
-    if (state.history.length === 0) return alert("No history to export");
-
-    const report = {
+    if (!state.history.length) {
+        showToast('No history to export', 'warning');
+        return;
+    }
+    const blob = new Blob([JSON.stringify({
         session_date: new Date().toISOString(),
         total_items: state.history.length,
         items: state.history
-    };
-
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `classsight-report-${Date.now()}.json`;
+    }, null, 2)], { type: 'application/json' });
+    const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob),
+        download: `classsight-report-${Date.now()}.json`
+    });
     a.click();
+    showToast('Report downloaded', 'success');
+}
+
+// ==================== Sidebar Toggle ====================
+function toggleSidebar() {
+    state.sidebarOpen = !state.sidebarOpen;
+    els.sidebar.classList.toggle('collapsed', !state.sidebarOpen);
 }
 
 // ==================== Utilities ====================
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (typeof text !== 'string') return '';
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
 }
 
+/**
+ * Format AI explanation text:
+ * - **bold** → <strong>
+ * - math expressions (E = ..., ∫, Δ, etc.) → .math-expr span
+ * - Numbered/bulleted lines
+ * - Paragraphs from blank lines
+ */
 function formatExplanation(text) {
-    return text.split('\n')
-        .filter(line => line.trim())
-        .map(line => `<p>${escapeHtml(line)}</p>`)
+    return text
+        .split('\n')
+        .filter(l => l.trim())
+        .map(line => {
+            // Escape first
+            let out = escapeHtml(line);
+            // Bold **text**
+            out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Math-like inline (simple heuristic: contains =,∫,∑,Δ,±,², ³, etc.)
+            out = out.replace(/([^ ]*[=∫∑∏Δ±⁰¹²³⁴⁵⁶⁷⁸⁹][^ ]*)/g, (m) => {
+                // Only wrap if it looks sufficiently mathy (has operator-like chars)
+                return `<span class="math-expr">${m}</span>`;
+            });
+            return `<p>${out}</p>`;
+        })
         .join('');
 }
 
 // ==================== Event Listeners ====================
 function setupEventListeners() {
-    // Manual Capture
     els.analyzeBtn.addEventListener('click', captureFrame);
+    addRipple(els.analyzeBtn);
 
-    // Mock Mode
     if (els.mockModeBtn) {
         els.mockModeBtn.addEventListener('click', triggerMockAnalysis);
+        addRipple(els.mockModeBtn);
     }
 
-    // Auto Capture Toggle
-    els.autoToggle.addEventListener('change', (e) => {
-        toggleAutoCapture(e.target.checked);
-    });
+    els.autoToggle.addEventListener('change', e => toggleAutoCapture(e.target.checked));
 
-    // Interval Change
-    els.intervalSelect.addEventListener('change', (e) => {
+    els.intervalSelect.addEventListener('change', e => {
         state.captureInterval = parseInt(e.target.value);
-        if (state.isAutoCapture) {
-            // Restart with new interval
-            toggleAutoCapture(true);
-        }
+        if (state.isAutoCapture) toggleAutoCapture(true);
     });
 
-    // History Controls
     els.clearHistoryBtn.addEventListener('click', clearHistory);
     els.downloadBtn.addEventListener('click', downloadReport);
+    addRipple(els.downloadBtn);
 
-    // Keyboard Shortcuts
+    if (els.sidebarToggle) {
+        els.sidebarToggle.addEventListener('click', toggleSidebar);
+    }
+
+    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT') return; // Ignore if typing
-
-        switch (e.key.toLowerCase()) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        switch (e.key) {
             case ' ':
-            case 'enter':
+            case 'Enter':
                 e.preventDefault();
                 captureFrame();
                 break;
             case 'a':
+            case 'A':
                 els.autoToggle.checked = !els.autoToggle.checked;
                 toggleAutoCapture(els.autoToggle.checked);
                 break;
-            // 'h' could toggle sidebar visibility in future
+            case 'h':
+            case 'H':
+                toggleSidebar();
+                break;
         }
     });
 }
