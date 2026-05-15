@@ -25,7 +25,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
                          ┌────────┴────────┐
                          │                 │
                     ┌────▼────┐      ┌─────▼──────┐
-                    │ EasyOCR │      │ Claude API │
+                    │ EasyOCR │      │  Grok API  │
                     │         │      │            │
                     │ Extracts│      │ Explains   │
                     │   text  │      │  content   │
@@ -47,7 +47,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
 - **Responsibilities**:
   - Accept video frames (as images)
   - Trigger OCR every N seconds
-  - Send OCR results to Claude
+  - Send OCR results to Grok
   - Return results to frontend
 - **Files**: `main.py`, `routes/`, `services/`
 
@@ -58,7 +58,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
 - **Why EasyOCR**: Works offline, good for handwriting/formulas
 - **File**: `services/ocr_service.py`
 
-### 4. **AI Service** (Claude)
+### 4. **AI Service** (Grok)
 - **What**: Explains/solves OCR text
 - **Input**: Detected text ("x² + 5x + 6")
 - **Output**: Explanation ("This is a quadratic equation...")
@@ -83,9 +83,9 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
          ↓
 3. EasyOCR reads frame → "E = mc²"
          ↓
-4. Server sends to Claude → "Explain: E = mc²"
+4. Server sends to Grok → "Explain: E = mc²"
          ↓
-5. Claude responds → "Einstein's mass-energy equivalence..."
+5. Grok responds → "Einstein's mass-energy equivalence..."
          ↓
 6. Frontend displays both text AND explanation
 ```
@@ -104,7 +104,7 @@ ClassSight/
 │   │   └── analysis.py         # Get OCR + AI results
 │   ├── services/
 │   │   ├── ocr_service.py      # EasyOCR wrapper
-│   │   ├── ai_service.py       # Claude API client
+│   │   ├── ai_service.py       # Grok API client
 │   │   └── frame_processor.py  # Manages frame queue
 │   └── models/
 │       └── schemas.py          # Data models (Pydantic)
@@ -129,7 +129,7 @@ ClassSight/
 |----------------|--------------|-------------------------------------------|
 | **Backend**    | FastAPI      | Fast, async, auto API docs, modern        |
 | **OCR**        | EasyOCR      | Works offline, handles formulas better    |
-| **AI**         | Claude API   | Strong reasoning, good with math/code     |
+| **AI**         | Grok (xAI)   | Strong reasoning, good with math/code     |
 | **Frontend**   | Vanilla JS   | Keep it simple, no build complexity       |
 | **Database**   | SQLite       | Only if we need history (defer for MVP)   |
 | **Video**      | Mock images  | Validate pipeline before WebRTC           |
@@ -158,7 +158,7 @@ ClassSight/
 2. **Second**: Set up Python + dependencies
 3. **Third**: Build FastAPI skeleton (hello world)
 4. **Fourth**: Add OCR to one static image
-5. **Fifth**: Add Claude explanation
+5. **Fifth**: Add Grok explanation
 6. **Sixth**: Create simple frontend
 7. **Seventh**: Connect everything
 
@@ -193,7 +193,7 @@ ClassSight/
 - Text extraction
 
 ### Phase 4: AI Service
-- Claude API integration
+- Grok API integration
 - Prompt engineering
 - Response formatting
 

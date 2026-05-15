@@ -15,6 +15,8 @@ from fastapi.responses import JSONResponse
 from models.schemas import OCRResponse, OCRHealthResponse, ErrorResponse, TextBlock
 from services.ocr_service import OCRService
 from services.ai_service import AIService
+from services.cache_service import CacheService
+from starlette.concurrency import run_in_threadpool
 from config import settings
 from utils.validators import InputValidator
 from middleware.slowapi_config import limiter, HEALTH_LIMIT, ANALYSIS_LIMIT, DEFAULT_LIMIT
@@ -28,6 +30,7 @@ router = APIRouter()
 # Initialize services (singleton)
 ocr_service = OCRService.get_instance()
 ai_service = AIService.get_instance()
+cache_service = CacheService.get_instance()
 
 # Initialize input validator
 validator = InputValidator()
@@ -161,7 +164,14 @@ async def analyze_image(
         }
         
         # Cache the successful response
-        cache_service.set_ocr_result(image_hash, response_data)
+        # Convert Pydantic models and datetime to JSON-safe primitives
+        # so OCRResponse(**cached_result) succeeds on cache hits
+        cacheable = {
+            **response_data,
+            "blocks": [b.model_dump() for b in response_data["blocks"]],
+            "timestamp": response_data["timestamp"].isoformat(),
+        }
+        cache_service.set_ocr_result(image_hash, cacheable)
         
         return OCRResponse(**response_data)
     

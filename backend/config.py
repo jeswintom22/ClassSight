@@ -25,7 +25,7 @@ class Settings:
     """Application settings loaded from environment variables."""
     
     # ==================== API Keys ====================
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")
     
     # ==================== Server Configuration ====================
     HOST: str = os.getenv("HOST", "0.0.0.0")
@@ -85,8 +85,8 @@ class Settings:
     # ==================== Frame Processing ====================
     FRAME_CAPTURE_INTERVAL: int = int(os.getenv("FRAME_CAPTURE_INTERVAL", "3"))
     
-    # ==================== AI Settings (Gemini) ====================
-    AI_MODEL: str = os.getenv("AI_MODEL", "gemini-flash-latest")  # Points to latest Flash model
+    # ==================== AI Settings (Grok) ====================
+    AI_MODEL: str = os.getenv("AI_MODEL", "grok-3")
     AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
     AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))
 
@@ -117,22 +117,22 @@ class Settings:
             ValueError: If critical settings are missing or insecure
         """
         # Check API key
-        if not self.GEMINI_API_KEY:
+        if not self.GROK_API_KEY:
             raise ValueError(
-                "❌ GEMINI_API_KEY not set in .env file. "
-                "Get your API key from: https://aistudio.google.com/app/apikey"
+                "❌ GROK_API_KEY not set in .env file. "
+                "Get your API key from: https://console.x.ai"
             )
         
         # Check for placeholder/example API keys (common mistake)
-        if self.GEMINI_API_KEY in ["your-api-key-here", "placeholder", "example"]:
+        if self.GROK_API_KEY in ["your-xai-api-key-here", "placeholder", "example"]:
             raise ValueError(
-                "❌ GEMINI_API_KEY appears to be a placeholder. "
+                "❌ GROK_API_KEY appears to be a placeholder. "
                 "Please set a valid API key in .env file."
             )
         
         # Warn if API key looks suspicious (too short)
-        if len(self.GEMINI_API_KEY) < 20:
-            print("⚠️  Warning: GEMINI_API_KEY seems unusually short. Please verify it's correct.")
+        if len(self.GROK_API_KEY) < 20:
+            print("⚠️  Warning: GROK_API_KEY seems unusually short. Please verify it's correct.")
         
         # Security: Ensure rate limiting is enabled in production
         if not self.DEBUG and not self.RATE_LIMIT_ENABLED:

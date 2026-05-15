@@ -12,6 +12,7 @@ Author: ClassSight Team
 """
 
 import easyocr
+import io
 import time
 from typing import List, Tuple
 from PIL import Image
@@ -55,7 +56,9 @@ class OCRService:
                 # This downloads models on first run (~500MB)
                 OCRService._reader = easyocr.Reader(
                     [settings.OCR_LANGUAGE],  # Languages to detect (default: English)
-                    gpu=settings.OCR_GPU       # Use GPU if available (default: False)
+                    gpu=settings.OCR_GPU,      # Use GPU if available (default: False)
+                    verbose=False,
+                    quantize=True
                 )
                 print("✅ EasyOCR model loaded successfully")
             except Exception as e:
@@ -213,12 +216,15 @@ class OCRService:
                 return image_source # Already numpy array
             else:
                 # Assume bytes or stream
-                 img = Image.open(image_source)
+                img = Image.open(image_source)
 
             # Max dimension
-            MAX_DIM = 1024
+            MAX_DIM = 800
             if img.width > MAX_DIM or img.height > MAX_DIM:
                 img.thumbnail((MAX_DIM, MAX_DIM), Image.Resampling.LANCZOS)
+            
+            if img.mode != 'L':
+                img = img.convert('L')
             
             return np.array(img)
             
@@ -226,9 +232,7 @@ class OCRService:
             print(f"⚠️ Image preprocessing failed: {e}")
             # Fallback to loading directly
             if isinstance(image_source, str):
-                 return np.array(Image.open(image_source))
+                return np.array(Image.open(image_source))
             return np.array(image_source)
 
-# Import io for bytes processing
-import io
 

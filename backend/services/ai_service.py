@@ -1,11 +1,11 @@
 """
-AI Service - Google Gemini Wrapper
+AI Service - xAI Grok Wrapper
 
 This service provides educational explanations for OCR-detected text
-using Google's Gemini API.
+using xAI's Grok API.
 
 Key Design Decisions:
-- Uses Gemini 1.5 Flash model (fast, free, excellent quality)
+- Uses Grok-3 model
 - Educational context optimized for classroom content
 - Handles math, code, and general text
 - Comprehensive error handling and retry logic
@@ -13,7 +13,7 @@ Key Design Decisions:
 Author: ClassSight Team
 """
 
-import google.generativeai as genai
+from openai import AsyncOpenAI
 import time
 from typing import Dict, Optional
 from config import settings
@@ -21,7 +21,7 @@ from config import settings
 
 class AIService:
     """
-    Wrapper around Google Gemini API for educational explanations.
+    Wrapper around xAI Grok API for educational explanations.
     
     Usage:
         ai_service = AIService.get_instance()
@@ -29,7 +29,7 @@ class AIService:
     """
     
     _instance = None
-    _model = None
+    _client = None
     
     def __new__(cls):
         """Singleton pattern: only one instance of AIService exists."""
@@ -46,26 +46,20 @@ class AIService:
     
     def __init__(self):
         """Initialize AI service (only runs once due to singleton)."""
-        if AIService._model is None:
-            print(f"Initializing Gemini AI with model: {settings.AI_MODEL}")
+        if AIService._client is None:
+            print(f"Initializing Grok AI with model: {settings.AI_MODEL}")
             
-            # Configure Gemini API
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            
-            # Initialize the model
-            AIService._model = genai.GenerativeModel(
-                model_name=settings.AI_MODEL,
-                generation_config={
-                    "temperature": settings.AI_TEMPERATURE,
-                    "max_output_tokens": settings.AI_MAX_TOKENS,
-                }
+            # Configure OpenAI API for xAI
+            AIService._client = AsyncOpenAI(
+                api_key=settings.GROK_API_KEY,
+                base_url="https://api.x.ai/v1",
             )
             
-            print("Gemini AI initialized successfully")
+            print("Grok AI initialized successfully")
     
     def is_ready(self) -> bool:
         """Check if AI service is ready to generate explanations."""
-        return AIService._model is not None
+        return AIService._client is not None
     
     async def explain_text(self, text: str, context: str = "classroom") -> Dict:
         """
@@ -116,10 +110,17 @@ class AIService:
             prompt = self._build_educational_prompt(text, context)
             
             # Generate explanation (ASYNC)
-            response = await AIService._model.generate_content_async(prompt)
+            response = await AIService._client.chat.completions.create(
+                model=settings.AI_MODEL,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE,
+            )
             
             # Extract the explanation text
-            explanation = response.text if response.text else "Unable to generate explanation."
+            explanation = response.choices[0].message.content if response.choices else "Unable to generate explanation."
             
             processing_time = time.time() - start_time
             
@@ -172,6 +173,7 @@ Guidelines:
 - Keep explanations student-friendly and engaging
 - Use examples when helpful
 - Be concise but thorough (2-4 sentences for simple content, more for complex topics)
+- Keep explanations under 150 words.
 """
         
         user_prompt = f"""The teacher has written or shown this content:
@@ -185,7 +187,7 @@ Please provide a clear educational explanation that would help students understa
         
         return full_prompt
     
-    def batch_explain(self, texts: list) -> list:
+    async def batch_explain(self, texts: list) -> list:
         """
         Explain multiple pieces of text in batch.
         
@@ -197,6 +199,6 @@ Please provide a clear educational explanation that would help students understa
         """
         results = []
         for text in texts:
-            result = self.explain_text(text)
+            result = await self.explain_text(text)
             results.append(result)
         return results

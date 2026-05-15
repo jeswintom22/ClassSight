@@ -15,7 +15,7 @@ ClassSight is an intelligent classroom tool designed to help students understand
 
 ## 🛠️ Technology Stack
 
-- **Backend**: FastAPI (Python), EasyOCR, Google Gemini 1.5 Flash.
+- **Backend**: FastAPI (Python), EasyOCR, xAI Grok-3.
 - **Performance**: Async/Await architecture, Threadpooling, TTLCache.
 - **Real-time**: WebSockets (Starlette).
 - **Frontend**: Vanilla HTML/CSS/JS (Zero dependencies, optimized for glassmorphism).
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ### 2. Configure API Keys
 Create a `.env` file in the root:
 ```env
-GEMINI_API_KEY=your_actual_gemini_key_here
+GROK_API_KEY=your_actual_grok_key_here
 OCR_GPU=False
 CACHE_ENABLED=True
 AUTO_CAPTURE_INTERVAL=5

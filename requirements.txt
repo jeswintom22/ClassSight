@@ -19,8 +19,8 @@ opencv-python==4.9.0.80
 torch==2.0.1
 torchvision==0.15.2
 
-# Google Gemini API
-google-generativeai>=0.3.0
+# xAI Grok API
+openai>=1.30.0
 
 # Security
 slowapi==0.1.9  # Rate limiting

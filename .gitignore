@@ -1,4 +1,4 @@
-﻿# Logs and Output Files
+# Logs and Output Files
 install_log.txt
 debug_output.txt
 test_output.txt
@@ -34,6 +34,12 @@ venv/
 ENV/
 env/
 .env/
+
+# Environment Variables
+.env
+.env.local
+.env.*
+!.env.example
 
 # IDE
 .vscode/
