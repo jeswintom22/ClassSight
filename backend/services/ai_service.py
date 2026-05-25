@@ -100,7 +100,7 @@ class AIService:
         cached_result = cache_service.get_ai_explanation(text_hash)
         
         if cached_result:
-            print("🧠 AI Cache Hit!")
+            print("[AI] Cache Hit!")
             return cached_result
 
         start_time = time.time()

@@ -48,7 +48,7 @@ class OCRService:
     def __init__(self):
         """Initialize OCR service (only runs once due to singleton)."""
         if OCRService._reader is None:
-            print(f"🔄 Initializing EasyOCR with language: {settings.OCR_LANGUAGE}")
+            print(f"[INFO] Initializing EasyOCR with language: {settings.OCR_LANGUAGE}")
             print(f"   GPU enabled: {settings.OCR_GPU}")
             
             try:
@@ -60,9 +60,9 @@ class OCRService:
                     verbose=False,
                     quantize=True
                 )
-                print("✅ EasyOCR model loaded successfully")
+                print("[OK] EasyOCR model loaded successfully")
             except Exception as e:
-                print(f"❌ Failed to load EasyOCR model: {e}")
+                print(f"[ERROR] Failed to load EasyOCR model: {e}")
                 OCRService._reader = None
     
     def is_ready(self) -> bool:
