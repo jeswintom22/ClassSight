@@ -110,6 +110,11 @@ class OCRResponse(BaseModel):
         description="AI model used for explanation",
         max_length=100
     )
+    ai_provider: Optional[str] = Field(
+        None,
+        description="AI provider id used for explanation (openai, xai, groq, ...)",
+        max_length=50
+    )
 
 
 class OCRHealthResponse(BaseModel):
@@ -126,6 +131,42 @@ class OCRHealthResponse(BaseModel):
         ...,
         description="Current OCR language setting",
         max_length=10
+    )
+
+
+class AIInfoResponse(BaseModel):
+    """Response model for the active AI provider info endpoint."""
+    model_config = ConfigDict(extra='forbid')
+    
+    provider: str = Field(
+        ...,
+        description="AI provider id (openai, xai, groq, custom, ...)",
+        max_length=50
+    )
+    provider_name: str = Field(
+        ...,
+        description="Friendly provider display name (e.g. xAI)",
+        max_length=50
+    )
+    model: str = Field(
+        ...,
+        description="Configured AI model",
+        max_length=100
+    )
+    base_url: str = Field(
+        ...,
+        description="Configured AI base URL",
+        max_length=300
+    )
+    retries: int = Field(
+        0,
+        ge=0,
+        le=10,
+        description="Configured retry count for transient failures"
+    )
+    configured: bool = Field(
+        ...,
+        description="Whether all required AI config is present"
     )
 
 

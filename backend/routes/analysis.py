@@ -10,7 +10,7 @@ Routes:
 Author: ClassSight Team
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, Request
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from models.schemas import OCRResponse, OCRHealthResponse, ErrorResponse, TextBlock
 from services.ocr_service import OCRService
@@ -43,9 +43,13 @@ validator = InputValidator()
     description="Returns status of the OCR service and whether the model is loaded."
 )
 @limiter.limit(HEALTH_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
-async def health_check(request: Request):
+async def health_check(request: Request, response: Response):
     """
     Health check endpoint for OCR service.
+    
+    Args:
+        request: FastAPI request (used by rate limiter)
+        response: FastAPI response (required by slowapi to inject rate-limit headers)
     
     Returns:
         OCRHealthResponse with service status
@@ -72,12 +76,15 @@ async def health_check(request: Request):
 @limiter.limit(ANALYSIS_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
 async def analyze_image(
     request: Request,
+    response: Response,
     file: UploadFile = File(..., description="Image file (PNG, JPG, JPEG)")
 ):
     """
     Upload an image and extract text using OCR.
     
     Args:
+        request: FastAPI request (used by rate limiter)
+        response: FastAPI response (required by slowapi to inject rate-limit headers)
         file: Uploaded image file
     
     Returns:
@@ -131,6 +138,7 @@ async def analyze_image(
         # Get AI explanation if text was found
         explanation = None
         ai_model = None
+        ai_provider = None
         
         if result["combined_text"] and result["combined_text"].strip():
             try:
@@ -147,6 +155,7 @@ async def analyze_image(
                 if ai_result["success"]:
                     explanation = ai_result["explanation"]
                     ai_model = ai_result["model"]
+                    ai_provider = ai_result.get("ai_provider")
             except Exception as e:
                 # Don't fail the whole request if AI fails
                 print(f"⚠️ AI explanation failed: {str(e)}")
@@ -159,6 +168,7 @@ async def analyze_image(
             "blocks": [TextBlock(**block) for block in result["blocks"]],
             "explanation": explanation,
             "ai_model": ai_model,
+            "ai_provider": ai_provider,
             "processing_time": result["processing_time"],
             "timestamp": datetime.now()
         }
@@ -193,7 +203,7 @@ async def analyze_image(
     description="Returns basic information about the OCR service."
 )
 @limiter.limit(DEFAULT_LIMIT if settings.RATE_LIMIT_ENABLED else "1000/minute")
-async def ocr_info(request: Request):
+async def ocr_info(request: Request, response: Response):
     """Default OCR endpoint with service information."""
     return {
         "service": "ClassSight OCR",

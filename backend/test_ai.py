@@ -1,7 +1,7 @@
 """
 AI Service Test Script
 
-Tests Google Gemini AI on sample educational content to verify
+Tests the configured AI provider on sample educational content to
 functionality before integrating with the OCR pipeline.
 
 Usage:
@@ -11,6 +11,7 @@ Author: ClassSight Team
 """
 
 import sys
+import asyncio
 import os
 
 # Add parent directory to path for imports
@@ -20,7 +21,7 @@ from services.ai_service import AIService
 from config import settings
 
 
-def test_ai_service():
+async def test_ai_service():
     """Test AI service on various educational content types."""
     
     print("=" * 70)
@@ -38,7 +39,7 @@ def test_ai_service():
     
     if not ai_service.is_ready():
         print("ERROR: AI service failed to initialize")
-        print("   Check your GEMINI_API_KEY in .env file")
+        print("   Check your AI_API_KEY / AI_BASE_URL / AI_MODEL in .env file")
         return
     
     print("AI service ready\n")
@@ -86,7 +87,7 @@ def test_ai_service():
         
         try:
             # Get explanation from AI
-            result = ai_service.explain_text(
+            result = await ai_service.explain_text(
                 text=test_case['text'],
                 context=test_case['context']
             )
@@ -141,9 +142,9 @@ def test_ai_service():
     elif passed_tests > 0:
         print("Some tests failed. Check API key and network connection.")
     else:
-        print("All tests failed. Verify GEMINI_API_KEY in .env file.")
-        print("   Get your free API key at: https://aistudio.google.com/app/apikey")
+        print("All tests failed. Verify AI_API_KEY, AI_BASE_URL, and AI_MODEL in .env file.")
+        print("   Get an API key from your AI provider (e.g. https://console.x.ai or https://platform.openai.com)")
 
 
 if __name__ == "__main__":
-    test_ai_service()
+    asyncio.run(test_ai_service())

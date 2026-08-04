@@ -155,7 +155,7 @@ class OCRService:
         start_time = time.time()
         
         try:
-            print(f"🔍 OCR Processing: Received {len(image_bytes)} bytes")
+            print(f"[OCR] Processing: Received {len(image_bytes)} bytes")
             
             # Preprocess image bytes (resize/convert)
             image_np = self._preprocess_image(io.BytesIO(image_bytes))
@@ -189,7 +189,7 @@ class OCRService:
             combined_text = "\n".join(all_text)
             processing_time = time.time() - start_time
             
-            print(f"✅ OCR Complete: {len(all_text)} lines, Avg Conf: {avg_confidence:.2f}, Time: {processing_time:.2f}s")
+            print(f"[OK] OCR Complete: {len(all_text)} lines, Avg Conf: {avg_confidence:.2f}, Time: {processing_time:.2f}s")
             
             return {
                 "combined_text": combined_text,
@@ -229,7 +229,7 @@ class OCRService:
             return np.array(img)
             
         except Exception as e:
-            print(f"⚠️ Image preprocessing failed: {e}")
+            print(f"[WARN] Image preprocessing failed: {e}")
             # Fallback to loading directly
             if isinstance(image_source, str):
                 return np.array(Image.open(image_source))

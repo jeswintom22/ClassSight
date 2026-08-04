@@ -15,6 +15,22 @@ const CONFIG = {
     MAX_HISTORY: 50
 };
 
+// Provider display names (mirrors backend PROVIDER_DISPLAY_NAMES in config.py)
+const PROVIDER_NAMES = {
+    openai: 'OpenAI',
+    xai: 'xAI',
+    groq: 'Groq',
+    openrouter: 'OpenRouter',
+    deepseek: 'DeepSeek',
+    together: 'Together',
+    mistral: 'Mistral',
+    custom: 'Custom'
+};
+
+function providerName(id) {
+    return PROVIDER_NAMES[id] || 'Custom';
+}
+
 // ==================== State ====================
 const state = {
     isProcessing: false,
@@ -154,7 +170,7 @@ function triggerMockAnalysis() {
                     combined_text: 'E = mc²\nTheory of Relativity\n\n∫ f(x) dx = F(b) − F(a)',
                     confidence: 0.99,
                     explanation: `**Mass-Energy Equivalence** is one of the most famous equations in physics.\n\nIn E = mc², E stands for energy, m for mass, and c is the speed of light (~3×10⁸ m/s).\n\nThis tells us that mass and energy are interchangeable — a tiny amount of mass can release an enormous amount of energy, which is the basis of nuclear reactions and atomic bombs.\n\nThe integral below it is the **Fundamental Theorem of Calculus**, connecting differentiation and integration.`,
-                    ai_model: 'Mock Gemini Flash',
+                    ai_model: 'Mock · Demo',
                     timestamp: Date.now() / 1000
                 }
             });
@@ -259,7 +275,12 @@ function renderOCR(data) {
 function renderAI(data) {
     if (data.explanation) {
         els.aiContent.innerHTML = `<div class="ai-explanation">${formatExplanation(data.explanation)}</div>`;
-        if (data.ai_model) els.aiModelBadge.textContent = data.ai_model;
+        if (data.ai_model) {
+            // Badge: "model · Provider" (D7) — e.g. "grok-3 · xAI"
+            els.aiModelBadge.textContent = data.ai_provider
+                ? `${data.ai_model} · ${providerName(data.ai_provider)}`
+                : data.ai_model;
+        }
     }
 }
 

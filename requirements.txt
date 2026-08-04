@@ -19,7 +19,7 @@ opencv-python==4.9.0.80
 torch==2.0.1
 torchvision==0.15.2
 
-# xAI Grok API
+# OpenAI-compatible AI API (any provider: xAI, OpenAI, Groq, ...)
 openai>=1.30.0
 
 # Security

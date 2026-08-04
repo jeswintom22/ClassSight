@@ -106,6 +106,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 # 4. Process AI (if text found)
                 explanation = None
                 ai_model = None
+                ai_provider = None
                 
                 if ocr_result["combined_text"] and ocr_result["combined_text"].strip():
                     print("🤖 Starting AI Analysis...")
@@ -113,6 +114,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     if ai_response["success"]:
                         explanation = ai_response["explanation"]
                         ai_model = ai_response["model"]
+                        ai_provider = ai_response.get("ai_provider")
                         print("✅ AI Analysis Complete")
                         
                         # Send AI update
@@ -120,7 +122,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             "type": "ai_result",
                             "data": {
                                 "explanation": explanation,
-                                "ai_model": ai_model
+                                "ai_model": ai_model,
+                                "ai_provider": ai_provider
                             }
                         }, websocket)
                     else:
@@ -136,6 +139,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "blocks": ocr_result["blocks"],
                     "explanation": explanation,
                     "ai_model": ai_model,
+                    "ai_provider": ai_provider,
                     "processing_time": round(time.time() - start_time, 3),
                     "timestamp": str(time.time())
                 }

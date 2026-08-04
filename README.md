@@ -15,7 +15,8 @@ ClassSight is an intelligent classroom tool designed to help students understand
 
 ## 🛠️ Technology Stack
 
-- **Backend**: FastAPI (Python), EasyOCR, xAI Grok-3.
+- **Backend**: FastAPI (Python), EasyOCR.
+- **AI**: Any OpenAI-compatible LLM — configurable via .env (`AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`).
 - **Performance**: Async/Await architecture, Threadpooling, TTLCache.
 - **Real-time**: WebSockets (Starlette).
 - **Frontend**: Vanilla HTML/CSS/JS (Zero dependencies, optimized for glassmorphism).
@@ -35,7 +36,9 @@ pip install -r requirements.txt
 ### 2. Configure API Keys
 Create a `.env` file in the root:
 ```env
-GROK_API_KEY=your_actual_grok_key_here
+AI_API_KEY=your_api_key_here
+AI_BASE_URL=https://api.x.ai/v1
+AI_MODEL=grok-3
 OCR_GPU=False
 CACHE_ENABLED=True
 AUTO_CAPTURE_INTERVAL=5

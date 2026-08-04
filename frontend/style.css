@@ -603,6 +603,7 @@ input:checked + .slider:before { transform: translateX(16px); }
 .ai-model-badge {
     font-size: 0.72rem;
     font-weight: 500;
+    white-space: nowrap;
     padding: 0.2rem 0.55rem;
     border-radius: 99px;
     background: rgba(99, 102, 241, 0.12);

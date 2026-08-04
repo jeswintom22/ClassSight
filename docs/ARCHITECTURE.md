@@ -25,7 +25,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
                          ┌────────┴────────┐
                          │                 │
                     ┌────▼────┐      ┌─────▼──────┐
-                    │ EasyOCR │      │  Grok API  │
+                    │ EasyOCR │      │  LLM API   │
                     │         │      │            │
                     │ Extracts│      │ Explains   │
                     │   text  │      │  content   │
@@ -40,14 +40,14 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
 - **What**: Provides frames to analyze
 - **MVP version**: Pre-saved images or simple webcam snapshots
 - **Why mock first**: Real WebRTC is complex; we validate the pipeline first
-- **File**: `mock_video.py`
+- **File**: `frontend/app.js` (webcam capture + mock mode)
 
 ### 2. **FastAPI Server** (Backend Brain)
 - **What**: Orchestrates everything
 - **Responsibilities**:
   - Accept video frames (as images)
   - Trigger OCR every N seconds
-  - Send OCR results to Grok
+  - Send OCR results to the configured LLM
   - Return results to frontend
 - **Files**: `main.py`, `routes/`, `services/`
 
@@ -58,7 +58,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
 - **Why EasyOCR**: Works offline, good for handwriting/formulas
 - **File**: `services/ocr_service.py`
 
-### 4. **AI Service** (Grok)
+### 4. **AI Service** (OpenAI-compatible LLM)
 - **What**: Explains/solves OCR text
 - **Input**: Detected text ("x² + 5x + 6")
 - **Output**: Explanation ("This is a quadratic equation...")
@@ -70,7 +70,7 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
   - Current frame
   - OCR text
   - AI explanation
-- **Files**: `static/index.html`, `static/app.js`
+- **Files**: `frontend/index.html`, `frontend/app.js`
 
 ---
 
@@ -83,9 +83,9 @@ ClassSight captures what a teacher writes/shows on video, reads it using OCR, an
          ↓
 3. EasyOCR reads frame → "E = mc²"
          ↓
-4. Server sends to Grok → "Explain: E = mc²"
+4. Server sends to LLM → "Explain: E = mc²"
          ↓
-5. Grok responds → "Einstein's mass-energy equivalence..."
+5. LLM responds → "Einstein's mass-energy equivalence..."
          ↓
 6. Frontend displays both text AND explanation
 ```
@@ -100,19 +100,20 @@ ClassSight/
 │   ├── main.py                 # FastAPI app entry point
 │   ├── config.py               # Settings (API keys, paths)
 │   ├── routes/
-│   │   ├── video.py            # Frame upload endpoint
-│   │   └── analysis.py         # Get OCR + AI results
+│   │   ├── analysis.py         # OCR analysis endpoint
+│   │   ├── ai.py               # AI provider info endpoint
+│   │   └── websocket.py        # Real-time WebSocket stream
 │   ├── services/
 │   │   ├── ocr_service.py      # EasyOCR wrapper
-│   │   ├── ai_service.py       # Grok API client
-│   │   └── frame_processor.py  # Manages frame queue
+│   │   ├── ai_service.py       # LLM API client (any provider)
+│   │   └── cache_service.py    # TTL caching
 │   └── models/
 │       └── schemas.py          # Data models (Pydantic)
 │
 ├── frontend/
 │   ├── index.html              # Main student UI
-│   ├── style.css               # Minimal styling
-│   └── app.js                  # Fetch OCR/AI results
+│   ├── style.css               # Glassmorphism styling
+│   └── app.js                  # WebSocket + UI logic
 │
 ├── mock_data/
 │   └── sample_frames/          # Test images (math, text)
@@ -129,7 +130,7 @@ ClassSight/
 |----------------|--------------|-------------------------------------------|
 | **Backend**    | FastAPI      | Fast, async, auto API docs, modern        |
 | **OCR**        | EasyOCR      | Works offline, handles formulas better    |
-| **AI**         | Grok (xAI)   | Strong reasoning, good with math/code     |
+| **AI**         | OpenAI-compatible LLM | Switchable via .env — pick the best model for the task |
 | **Frontend**   | Vanilla JS   | Keep it simple, no build complexity       |
 | **Database**   | SQLite       | Only if we need history (defer for MVP)   |
 | **Video**      | Mock images  | Validate pipeline before WebRTC           |
@@ -158,7 +159,7 @@ ClassSight/
 2. **Second**: Set up Python + dependencies
 3. **Third**: Build FastAPI skeleton (hello world)
 4. **Fourth**: Add OCR to one static image
-5. **Fifth**: Add Grok explanation
+5. **Fifth**: Add AI explanation
 6. **Sixth**: Create simple frontend
 7. **Seventh**: Connect everything
 
@@ -193,7 +194,7 @@ ClassSight/
 - Text extraction
 
 ### Phase 4: AI Service
-- Grok API integration
+- LLM API integration
 - Prompt engineering
 - Response formatting
 

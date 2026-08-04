@@ -21,11 +21,23 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Friendly display names for known OpenAI-compatible providers (UI badge)
+PROVIDER_DISPLAY_NAMES = {
+    "openai": "OpenAI",
+    "xai": "xAI",
+    "groq": "Groq",
+    "openrouter": "OpenRouter",
+    "deepseek": "DeepSeek",
+    "together": "Together",
+    "mistral": "Mistral",
+    "custom": "Custom",
+}
+
 class Settings:
     """Application settings loaded from environment variables."""
     
     # ==================== API Keys ====================
-    GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")
+    AI_API_KEY: str = os.getenv("AI_API_KEY", "")
     
     # ==================== Server Configuration ====================
     HOST: str = os.getenv("HOST", "0.0.0.0")
@@ -85,10 +97,14 @@ class Settings:
     # ==================== Frame Processing ====================
     FRAME_CAPTURE_INTERVAL: int = int(os.getenv("FRAME_CAPTURE_INTERVAL", "3"))
     
-    # ==================== AI Settings (Grok) ====================
-    AI_MODEL: str = os.getenv("AI_MODEL", "grok-3")
+    # ==================== AI Settings (any OpenAI-compatible provider) ====================
+    # Generic keys: point AI_BASE_URL at any OpenAI-compatible /chat/completions endpoint.
+    AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")
+    AI_MODEL: str = os.getenv("AI_MODEL", "")  # Required - no default
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "")  # Optional override (openai|xai|groq|...)
     AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
     AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))
+    AI_RETRIES: int = max(0, min(int(os.getenv("AI_RETRIES", "2")), 10))  # Clamped 0-10
 
     # ==================== Caching Settings ====================
     CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "True").lower() == "true"
@@ -101,12 +117,55 @@ class Settings:
     # ==================== Auto-Capture Settings ====================
     AUTO_CAPTURE_INTERVAL: int = int(os.getenv("AUTO_CAPTURE_INTERVAL", "5"))
     
+    # ==================== AI Provider Resolution ====================
+
+    def resolve_provider(self) -> str:
+        """
+        Resolve the active AI provider id.
+        
+        Priority:
+        1. AI_PROVIDER env var (explicit override) wins
+        2. Auto-detect from known domain fragments in AI_BASE_URL
+        3. Fall back to 'custom'
+        
+        Returns:
+            Provider id string (openai, xai, groq, openrouter, deepseek,
+            together, mistral, custom)
+        """
+        if self.AI_PROVIDER:
+            return self.AI_PROVIDER.strip().lower()
+        
+        base_url = self.AI_BASE_URL.lower()
+        if "api.openai.com" in base_url:
+            return "openai"
+        if "api.x.ai" in base_url:
+            return "xai"
+        if "api.groq.com" in base_url:
+            return "groq"
+        if "openrouter.ai" in base_url:
+            return "openrouter"
+        if "api.deepseek.com" in base_url:
+            return "deepseek"
+        if "api.together.xyz" in base_url:
+            return "together"
+        if "api.mistral.ai" in base_url:
+            return "mistral"
+        return "custom"
+
+    def provider_display_name(self) -> str:
+        """Get the friendly display name for the active provider (for UI badges)."""
+        return PROVIDER_DISPLAY_NAMES.get(self.resolve_provider(), "Custom")
+
+    def ai_config_complete(self) -> bool:
+        """Whether all required AI config (key, base URL, model) is present."""
+        return bool(self.AI_API_KEY and self.AI_BASE_URL and self.AI_MODEL)
+
     def validate(self) -> bool:
         """
         Validate that required settings are present and secure.
         
         Security checks:
-        - API key is set and not a placeholder
+        - AI API key, base URL, and model are set and not placeholders
         - File size limits are reasonable
         - Rate limiting is enabled in production
         
@@ -116,23 +175,46 @@ class Settings:
         Raises:
             ValueError: If critical settings are missing or insecure
         """
-        # Check API key
-        if not self.GROK_API_KEY:
+        # Check AI API key
+        if not self.AI_API_KEY:
             raise ValueError(
-                "❌ GROK_API_KEY not set in .env file. "
-                "Get your API key from: https://console.x.ai"
+                "❌ AI_API_KEY not set in .env file. "
+                "Get an API key from your AI provider "
+                "(e.g. https://console.x.ai or https://platform.openai.com)."
+            )
+        
+        # Check AI base URL
+        if not self.AI_BASE_URL:
+            raise ValueError(
+                "❌ AI_BASE_URL not set in .env file. "
+                "e.g. https://api.x.ai/v1 or https://api.openai.com/v1"
+            )
+        
+        # Check AI model (required - no default)
+        if not self.AI_MODEL:
+            raise ValueError(
+                "❌ AI_MODEL not set in .env file. "
+                "e.g. grok-3, gpt-4o-mini, llama-3.3-70b-versatile"
+            )
+        
+        # Legacy GROK_API_KEY migration hint
+        if os.getenv("GROK_API_KEY"):
+            raise ValueError(
+                "❌ GROK_API_KEY is no longer supported. "
+                "Set AI_API_KEY, AI_BASE_URL (e.g. https://api.x.ai/v1) "
+                "and AI_MODEL instead."
             )
         
         # Check for placeholder/example API keys (common mistake)
-        if self.GROK_API_KEY in ["your-xai-api-key-here", "placeholder", "example"]:
+        if self.AI_API_KEY in ["your-api-key-here", "your-xai-api-key-here", "placeholder", "example"]:
             raise ValueError(
-                "❌ GROK_API_KEY appears to be a placeholder. "
+                "❌ AI_API_KEY appears to be a placeholder. "
                 "Please set a valid API key in .env file."
             )
         
         # Warn if API key looks suspicious (too short)
-        if len(self.GROK_API_KEY) < 20:
-            print("⚠️  Warning: GROK_API_KEY seems unusually short. Please verify it's correct.")
+        if len(self.AI_API_KEY) < 20:
+            print("⚠️  Warning: AI_API_KEY seems unusually short. Please verify it's correct.")
         
         # Security: Ensure rate limiting is enabled in production
         if not self.DEBUG and not self.RATE_LIMIT_ENABLED:

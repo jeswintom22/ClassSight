@@ -51,10 +51,10 @@ This document outlines the security measures implemented in ClassSight and best 
 - ✅ No keys exposed to client-side code
 
 **Key Rotation Procedure**:
-1. Generate new API key at https://console.x.ai
-2. Update `GROK_API_KEY` in `.env` file
+1. Generate a new API key at your AI provider's console (e.g. https://console.x.ai, https://platform.openai.com)
+2. Update `AI_API_KEY` (and `AI_BASE_URL` / `AI_MODEL` if switching providers) in `.env` file
 3. Restart the application
-4. Revoke old API key in xAI Console
+4. Revoke the old API key in the provider's console
 
 ### 4. CORS (Cross-Origin Resource Sharing)
 
@@ -140,7 +140,7 @@ RATE_LIMIT_ENABLED=True
 
 ### API Key Compromise
 
-1. **Immediate**: Revoke compromised key in Google AI Studio
+1. **Immediate**: Revoke the compromised key in your AI provider's console
 2. Generate new API key
 3. Update `.env` file with new key
 4. Restart application
