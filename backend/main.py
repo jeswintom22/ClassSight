@@ -169,5 +169,6 @@ if __name__ == "__main__":
         "main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.DEBUG  # Auto-reload only in debug mode
+        reload=settings.DEBUG,  # Auto-reload only in debug mode
+        ws_max_size=settings.MAX_UPLOAD_SIZE
     )
