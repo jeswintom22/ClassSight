@@ -112,28 +112,26 @@ async def analyze_image(
     # Reset file pointer for processing
     await file.seek(0)
     
+    temp_path = None
     try:
-        # Save uploaded file temporarily
-        # EasyOCR works best with file paths
-        file_ext = os.path.splitext(safe_filename)[1].lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-            temp_file.write(contents)
-            temp_path = temp_file.name
-        
         # Calculate image hash for caching
         image_hash = cache_service.get_image_hash(contents)
         
-        # Check cache
+        # Check cache before touching the filesystem
         cached_result = cache_service.get_ocr_result(image_hash)
         if cached_result:
             print("🖼️ Image Cache Hit!")
             return OCRResponse(**cached_result)
         
+        # Save uploaded file temporarily
+        # EasyOCR works best with file paths
+        file_ext = os.path.splitext(safe_filename)[1].lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            temp_path = temp_file.name
+            temp_file.write(contents)
+        
         # Process with OCR service (run in threadpool to avoid blocking main loop)
         result = await run_in_threadpool(ocr_service.extract_text, temp_path)
-        
-        # Clean up temporary file
-        os.unlink(temp_path)
         
         # Get AI explanation if text was found
         explanation = None
@@ -186,15 +184,16 @@ async def analyze_image(
         return OCRResponse(**response_data)
     
     except Exception as e:
-        # Clean up temp file if it exists
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.unlink(temp_path)
-        
         # Return error response
         raise HTTPException(
             status_code=500,
             detail=f"OCR processing failed: {str(e)}"
         )
+    
+    finally:
+        # Always remove the temporary upload, whatever path we exit through
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 
 @router.get(
