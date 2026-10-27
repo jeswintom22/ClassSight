@@ -3,9 +3,11 @@
 
 // ==================== Configuration ====================
 const getWsUrl = () => {
-    if (window.location.protocol === 'file:') return 'ws://localhost:8000/api/ws/stream';
+    const token = new URLSearchParams(window.location.search).get('token');
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    if (window.location.protocol === 'file:') return `ws://localhost:8000/api/ws/stream${query}`;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}/api/ws/stream`;
+    return `${proto}//${window.location.host}/api/ws/stream${query}`;
 };
 
 const CONFIG = {

@@ -113,6 +113,12 @@ class Settings:
 
     # ==================== WebSocket Settings ====================
     WS_HEARTBEAT_INTERVAL: int = int(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
+    # Optional shared secret; when set, clients must connect with ?token=<WS_AUTH_TOKEN>
+    WS_AUTH_TOKEN: str = os.getenv("WS_AUTH_TOKEN", "")
+    WS_MAX_CONNECTIONS_PER_IP: int = int(os.getenv("WS_MAX_CONNECTIONS_PER_IP", "3"))
+    # Minimum seconds between frames on one connection (frontend captures every >= 3s)
+    WS_MIN_FRAME_INTERVAL: float = float(os.getenv("WS_MIN_FRAME_INTERVAL", "1.0"))
+    WS_MAX_FRAMES_PER_MINUTE: int = int(os.getenv("WS_MAX_FRAMES_PER_MINUTE", "30"))
 
     # ==================== Auto-Capture Settings ====================
     AUTO_CAPTURE_INTERVAL: int = int(os.getenv("AUTO_CAPTURE_INTERVAL", "5"))
